@@ -1,0 +1,60 @@
+# Environment — NEVER commit these
+.env
+.env.local
+.env.*.local
+mobile/.env
+mobile/.env.local
+admin/.env
+admin/.env.local
+env
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Expo / React Native
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+mobile/*.jks
+mobile/*.p8
+mobile/*.p12
+mobile/*.key
+mobile/*.mobileprovision
+mobile/*.orig.*
+mobile/ios/
+mobile/android/
+
+# Next.js
+admin/.next/
+admin/out/
+admin/build/
+
+# Vercel
+.vercel
+
+# Supabase
+supabase/.temp/
+supabase/functions/.cache/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+
+# IDE
+.idea/
+*.swp
+*.swo
+.vscode/settings.json
+
+# Logs
+*.log
+
+# Temp
+tmp/
+temp/

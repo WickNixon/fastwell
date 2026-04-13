@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "Fastwell",
+    "slug": "fastwell",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "fastwell",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#5C8A34"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.wickedwellbeing.fastwell",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "Fastwell reads your health data from Apple Health to automatically track your steps, sleep, and workouts so you don't have to log them manually.",
+        "NSHealthUpdateUsageDescription": "Fastwell writes water intake data to Apple Health to keep your records consistent."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#5C8A34"
+      },
+      "package": "com.wickedwellbeing.fastwell"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#5C8A34"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
