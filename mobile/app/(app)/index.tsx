@@ -163,6 +163,18 @@ export default function HomeScreen() {
         </View>
       )}
 
+      {/* Rewards shortcut */}
+      <TouchableOpacity
+        style={[styles.rewardsRow, { backgroundColor: theme.surface, borderColor: theme.border }]}
+        onPress={() => router.push('/(app)/rewards' as never)}
+        accessibilityRole="button"
+        accessibilityLabel="View your badges and rewards"
+      >
+        <Text style={{ fontSize: 20 }}>🏅</Text>
+        <Text style={[Typography.body, { color: theme.textPrimary, flex: 1 }]}>Your badges & rewards</Text>
+        <Text style={[Typography.muted, { color: theme.textMuted }]}>›</Text>
+      </TouchableOpacity>
+
       {/* Quick Check-in Strip */}
       <View style={styles.section}>
         <Text style={[Typography.label, { color: theme.textMuted, marginBottom: 12 }]}>QUICK CHECK-IN</Text>
@@ -212,6 +224,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   dismissButton: { paddingLeft: 12, paddingTop: 2 },
+  rewardsRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, padding: 16, gap: 12, marginBottom: 24, minHeight: 56 },
   checkInStrip: { flexDirection: 'row', gap: 10 },
   checkInItem: {
     flex: 1,

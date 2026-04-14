@@ -50,6 +50,12 @@ export default function AppLayout() {
           tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} />,
         }}
       />
+
+      {/* Hidden screens — navigable but not shown in tab bar */}
+      <Tabs.Screen name="biomarkers" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="supplements" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="rewards" options={{ href: null, headerShown: false }} />
+      <Tabs.Screen name="paywall" options={{ href: null, headerShown: false }} />
     </Tabs>
   );
 }
