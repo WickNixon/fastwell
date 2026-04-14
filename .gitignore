@@ -32,6 +32,10 @@ mobile/android/
 admin/.next/
 admin/out/
 admin/build/
+web/.next/
+web/out/
+web/build/
+web/.env.local
 
 # Vercel
 .vercel

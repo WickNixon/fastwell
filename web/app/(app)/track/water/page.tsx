@@ -1,0 +1,107 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
+import { getSupabase } from '@/lib/supabase-browser';
+
+const GOALS = [500, 1000, 1500, 2000, 2500, 3000];
+const TODAY = new Date().toISOString().split('T')[0];
+
+export default function TrackWaterPage() {
+  const { profile } = useAuth();
+  const router = useRouter();
+  const [current, setCurrent] = useState(0);
+  const [entryId, setEntryId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!profile) return;
+    getSupabase()
+      .from('health_entries')
+      .select('id, value')
+      .eq('user_id', profile.id)
+      .eq('entry_date', TODAY)
+      .eq('metric', 'water_ml')
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) { setCurrent(data.value ?? 0); setEntryId(data.id); }
+      });
+  }, [profile]);
+
+  const save = async (ml: number) => {
+    if (!profile) return;
+    setSaving(true);
+    const entry = { user_id: profile.id, entry_date: TODAY, metric: 'water_ml', value: ml, unit: 'ml', source: 'manual' };
+    if (entryId) {
+      await getSupabase().from('health_entries').update({ value: ml }).eq('id', entryId);
+    } else {
+      const { data } = await getSupabase().from('health_entries').insert(entry).select('id').single();
+      if (data) setEntryId(data.id);
+    }
+    setCurrent(ml);
+    setSaving(false);
+  };
+
+  const add = (ml: number) => save(current + ml);
+
+  const pct = Math.min((current / 2000) * 100, 100);
+
+  return (
+    <div className="page page-top">
+      <button onClick={() => router.back()} style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Lato, sans-serif' }}>
+        ← Back
+      </button>
+      <h1 className="h1 mb-4">Water</h1>
+      <p className="body-sm mb-24">Today's intake</p>
+
+      {/* Visual fill indicator */}
+      <div style={{ textAlign: 'center', marginBottom: 32 }}>
+        <div style={{ fontSize: 64 }}>💧</div>
+        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 36, color: 'var(--primary)', marginTop: 8 }}>
+          {current >= 1000 ? `${(current / 1000).toFixed(1)}L` : `${current}ml`}
+        </p>
+        <p className="body-sm">of 2,000ml daily goal</p>
+        <div style={{ height: 8, backgroundColor: 'var(--border)', borderRadius: 4, margin: '12px auto', maxWidth: 280 }}>
+          <div style={{ height: 8, backgroundColor: 'var(--primary)', borderRadius: 4, width: `${pct}%`, transition: 'width 0.4s ease' }} />
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 24 }}>
+        {[250, 500, 750].map(ml => (
+          <button
+            key={ml}
+            className="btn btn-outline btn-sm"
+            onClick={() => add(ml)}
+            disabled={saving}
+          >
+            +{ml}ml
+          </button>
+        ))}
+      </div>
+
+      <p className="section-label mb-12">Set a specific amount</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+        {GOALS.map(ml => (
+          <button
+            key={ml}
+            onClick={() => save(ml)}
+            style={{
+              padding: '12px 8px',
+              borderRadius: 10,
+              border: `2px solid ${current === ml ? 'var(--primary)' : 'var(--border)'}`,
+              backgroundColor: current === ml ? 'var(--primary-pale)' : 'var(--surface)',
+              fontFamily: 'Montserrat, sans-serif',
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: 'pointer',
+              color: current === ml ? 'var(--primary)' : 'var(--text)',
+            }}
+          >
+            {ml >= 1000 ? `${ml / 1000}L` : `${ml}ml`}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

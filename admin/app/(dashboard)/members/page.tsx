@@ -1,13 +1,17 @@
 import { createServerClient } from '@/lib/supabase';
 
 async function getMembers() {
-  const supabase = createServerClient();
-  const { data } = await supabase
-    .from('profiles')
-    .select('id, first_name, full_name, subscription_tier, subscription_status, trial_ends_at, created_at, onboarding_complete')
-    .order('created_at', { ascending: false })
-    .limit(100);
-  return data ?? [];
+  try {
+    const supabase = createServerClient();
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, first_name, full_name, subscription_tier, subscription_status, trial_ends_at, created_at, onboarding_complete')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    return data ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export default async function MembersPage() {
@@ -39,7 +43,13 @@ export default async function MembersPage() {
             </tr>
           </thead>
           <tbody>
-            {members.map((m) => {
+            {members.length === 0 ? (
+              <tr>
+                <td colSpan={5} style={{ padding: '24px 16px', textAlign: 'center', color: '#7A9A6A', fontSize: 14 }}>
+                  No members yet
+                </td>
+              </tr>
+            ) : members.map((m) => {
               const c = tierBadge(m.subscription_tier ?? 'inactive');
               return (
                 <tr key={m.id} style={{ borderTop: '1px solid #EAF3DC' }}>

@@ -1,34 +1,45 @@
 import { createServerClient } from '@/lib/supabase';
 
 async function getStats() {
-  const supabase = createServerClient();
+  try {
+    const supabase = createServerClient();
 
-  const [total, members, subscribers, pending, badges] = await Promise.all([
-    supabase.from('profiles').select('id', { count: 'exact', head: true }),
-    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('subscription_tier', 'member'),
-    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('subscription_tier', 'subscriber'),
-    supabase.from('invite_tokens').select('id', { count: 'exact', head: true }).eq('is_used', false).gt('expires_at', new Date().toISOString()),
-    supabase.from('user_badges').select('id', { count: 'exact', head: true }),
-  ]);
+    const [total, members, subscribers, pending, badges] = await Promise.all([
+      supabase.from('profiles').select('id', { count: 'exact', head: true }),
+      supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('subscription_tier', 'member'),
+      supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('subscription_tier', 'subscriber'),
+      supabase.from('invite_tokens').select('id', { count: 'exact', head: true }).eq('is_used', false).gt('expires_at', new Date().toISOString()),
+      supabase.from('user_badges').select('id', { count: 'exact', head: true }),
+    ]);
 
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const { data: quietUsers } = await supabase
-    .from('profiles')
-    .select('id, first_name, updated_at')
-    .neq('subscription_tier', 'inactive')
-    .lt('updated_at', sevenDaysAgo.toISOString())
-    .order('updated_at')
-    .limit(10);
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const { data: quietUsers } = await supabase
+      .from('profiles')
+      .select('id, first_name, updated_at')
+      .neq('subscription_tier', 'inactive')
+      .lt('updated_at', sevenDaysAgo.toISOString())
+      .order('updated_at')
+      .limit(10);
 
-  return {
-    total: total.count ?? 0,
-    members: members.count ?? 0,
-    subscribers: subscribers.count ?? 0,
-    pendingInvites: pending.count ?? 0,
-    totalBadges: badges.count ?? 0,
-    quietUsers: quietUsers ?? [],
-  };
+    return {
+      total: total.count ?? 0,
+      members: members.count ?? 0,
+      subscribers: subscribers.count ?? 0,
+      pendingInvites: pending.count ?? 0,
+      totalBadges: badges.count ?? 0,
+      quietUsers: quietUsers ?? [],
+    };
+  } catch {
+    return {
+      total: 0,
+      members: 0,
+      subscribers: 0,
+      pendingInvites: 0,
+      totalBadges: 0,
+      quietUsers: [],
+    };
+  }
 }
 
 export default async function DashboardPage() {
