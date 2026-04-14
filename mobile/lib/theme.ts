@@ -1,9 +1,24 @@
 import { useColorScheme } from 'react-native';
+import { useContext } from 'react';
+import { AuthContext } from '@/lib/auth-context';
 import { Colors, ThemeColors } from '@/constants/colors';
 
+/**
+ * Returns the active theme colours.
+ * Reads profile.theme_preference from AuthContext and overrides the system
+ * colour scheme when explicitly set to 'light' or 'dark'.
+ * Falls back gracefully to system scheme when called outside AuthProvider.
+ */
 export function useTheme(): ThemeColors & { isDark: boolean } {
-  const scheme = useColorScheme();
-  const isDark = scheme === 'dark';
+  const { profile } = useContext(AuthContext);
+  const systemScheme = useColorScheme();
+  const pref = profile?.theme_preference ?? 'system';
+
+  let isDark: boolean;
+  if (pref === 'dark') isDark = true;
+  else if (pref === 'light') isDark = false;
+  else isDark = systemScheme === 'dark';
+
   return { ...Colors[isDark ? 'dark' : 'light'], isDark };
 }
 

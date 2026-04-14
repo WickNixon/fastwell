@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { useRouter, useSegments } from 'expo-router';
 import { supabase } from './supabase';
+import { registerPushToken, clearPushToken } from './notifications';
 import type { Profile } from './types';
 
 interface AuthContextType {
@@ -13,7 +14,7 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType>({
+export const AuthContext = createContext<AuthContextType>({
   session: null,
   user: null,
   profile: null,
@@ -35,7 +36,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .select('*')
       .eq('id', userId)
       .single();
-    if (data) setProfile(data as Profile);
+    if (data) {
+      setProfile(data as Profile);
+      // Register push token in background — does not block UI
+      registerPushToken(userId).catch(() => {});
+    }
   };
 
   useEffect(() => {
@@ -76,6 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [session, profile, loading, segments]);
 
   const signOut = async () => {
+    if (session?.user) clearPushToken(session.user.id).catch(() => {});
     await supabase.auth.signOut();
     setSession(null);
     setProfile(null);

@@ -21,6 +21,7 @@ export interface Profile {
   role: string;
   timezone: string;
   weight_unit: string;
+  push_token: string | null;
   onboarding_complete: boolean;
   created_at: string;
   updated_at: string;

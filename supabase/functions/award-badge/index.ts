@@ -75,6 +75,27 @@ Deno.serve(async (req) => {
       seen: false,
     });
 
+    // Send push notification if user has a token
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('push_token')
+      .eq('id', user_id)
+      .single();
+
+    if (profile?.push_token?.startsWith('ExponentPushToken[')) {
+      await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          to: profile.push_token,
+          title: badge.name,
+          body: badge.message,
+          sound: 'default',
+          data: { badge_key, screen: 'rewards' },
+        }),
+      }).catch(() => {}); // non-critical
+    }
+
     return jsonResponse({ awarded: true, badge_name: badge.name, message: badge.message });
   } catch (e) {
     console.error('award-badge error:', e);
