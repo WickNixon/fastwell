@@ -6,6 +6,6 @@ import { getSupabase } from './supabase-browser';
  * to ensure the token is current and not stale.
  */
 export async function getAuthUserId(): Promise<string | null> {
-  const { data: { user } } = await getSupabase().auth.getUser();
-  return user?.id ?? null;
+  const { data: { session } } = await getSupabase().auth.getSession();
+  return session?.user?.id ?? null;
 }
