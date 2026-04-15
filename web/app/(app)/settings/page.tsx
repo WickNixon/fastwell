@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 const MENU = [
   { href: '/settings/profile', icon: '👤', label: 'Profile', sub: 'Name, age, stage' },
   { href: '/settings/subscription', icon: '💳', label: 'Subscription', sub: 'Plan, billing, trial' },
+  { href: '/rewards', icon: '🏅', label: 'My Milestones', sub: 'Badges and achievements' },
   { href: '/settings/appearance', icon: '🎨', label: 'Appearance', sub: 'Light or dark mode' },
   { href: '/settings/change-password', icon: '🔒', label: 'Change password', sub: null },
   { href: '/settings/integrations', icon: '🔗', label: 'Integrations', sub: 'Apple Health, Garmin — coming soon' },
@@ -44,7 +45,7 @@ export default function SettingsPage() {
         Log out
       </button>
 
-      <p className="body-sm text-center mt-20" style={{ opacity: 0.5 }}>Fastwell v0.1</p>
+      <p className="body-sm text-center mt-20" style={{ opacity: 0.5 }}>Fastwell v1.1.4</p>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { getSupabase } from '@/lib/supabase-browser';
 
 export default function OnboardingCompletePage() {
   const { profile, refreshProfile } = useAuth();
@@ -9,6 +10,14 @@ export default function OnboardingCompletePage() {
   const name = profile?.first_name ?? 'there';
 
   const handleGo = async () => {
+    if (profile) {
+      await getSupabase().from('user_badges').upsert({
+        user_id: profile.id,
+        badge_key: 'onboarding_complete',
+        badge_name: 'Welcome to Fastwell',
+        seen: false,
+      }, { onConflict: 'user_id,badge_key' });
+    }
     await refreshProfile();
     router.push('/dashboard');
   };
