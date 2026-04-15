@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 const TODAY = new Date().toISOString().split('T')[0];
 
 export default function TrackWaterPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const supabase = createClient();
   const router = useRouter();
   const [current, setCurrent] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -27,12 +29,12 @@ export default function TrackWaterPage() {
   }, [profile]);
 
   const save = async (ml: number) => {
-    if (!profile?.id || saving) return;
+    if (!user || saving) return;
     setSaving(true);
-    const { error } = await getSupabase()
+    const { error } = await supabase
       .from('health_entries')
       .upsert({
-        user_id: profile.id,
+        user_id: user.id,
         entry_date: TODAY,
         metric: 'water_ml',
         value: ml,

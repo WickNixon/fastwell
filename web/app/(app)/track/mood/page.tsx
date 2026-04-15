@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { HealthEntry } from '@/lib/types';
 
@@ -18,7 +19,8 @@ function isoDate(d: Date) { return d.toISOString().split('T')[0]; }
 const TODAY = isoDate(new Date());
 
 export default function TrackMoodPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const supabase = createClient();
   const router = useRouter();
   const [selected, setSelected] = useState<number | null>(null);
   const [trend, setTrend] = useState<HealthEntry[]>([]);
@@ -39,12 +41,12 @@ export default function TrackMoodPage() {
   useEffect(() => { load(); }, [load]);
 
   const save = async (val: number) => {
-    if (!profile?.id || saving) return;
+    if (!user || saving) return;
     setSaving(true);
     setSelected(val);
-    const { error } = await getSupabase().from('health_entries')
+    const { error } = await supabase.from('health_entries')
       .upsert({
-        user_id: profile.id, entry_date: TODAY, metric: 'mood',
+        user_id: user.id, entry_date: TODAY, metric: 'mood',
         value: val, unit: 'scale_1_5', source: 'manual',
       }, { onConflict: 'user_id,entry_date,metric,source' });
     if (error) {

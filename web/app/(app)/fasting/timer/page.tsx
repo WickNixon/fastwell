@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { FastingSession } from '@/lib/types';
 
@@ -14,7 +15,8 @@ const PROTOCOLS = [
 ];
 
 export default function FastingTimerPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const supabase = createClient();
   const router = useRouter();
   const [activeFast, setActiveFast] = useState<FastingSession | null>(null);
   const [elapsed, setElapsed] = useState(0); // seconds
@@ -54,12 +56,12 @@ export default function FastingTimerPage() {
   }, [profile, startTick]);
 
   const startFast = async () => {
-    if (!profile?.id || starting) return;
+    if (!user || starting) return;
     setStarting(true);
     setError('');
-    const { data, error: err } = await getSupabase()
+    const { data, error: err } = await supabase
       .from('fasting_sessions')
-      .insert({ user_id: profile.id, protocol: selectedProtocol, started_at: new Date().toISOString() })
+      .insert({ user_id: user.id, protocol: selectedProtocol, started_at: new Date().toISOString() })
       .select()
       .single();
     if (err) {

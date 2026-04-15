@@ -63,7 +63,7 @@ const NAV = [
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { loading, session, profile } = useAuth();
+  const { loading, user, profile } = useAuth();
   const [timedOut, setTimedOut] = useState(false);
 
   // Hard timeout: if auth loading takes more than 5s, show the page anyway
@@ -75,9 +75,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading && !timedOut) return;
-    if (!session) { router.push('/login'); return; }
+    if (!user) { router.push('/login'); return; }
     if (profile && !profile.onboarding_complete) { router.push('/onboarding/name'); }
-  }, [loading, timedOut, session, profile]);
+  }, [loading, timedOut, user, profile]);
 
   if (loading && !timedOut) {
     return (

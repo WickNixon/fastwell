@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
+import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { FastingSession } from '@/lib/types';
 
@@ -351,7 +352,8 @@ function AddHabitModal({
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const supabase = createClient();
   const router = useRouter();
 
   // Fasting state
@@ -440,12 +442,12 @@ export default function DashboardPage() {
   useEffect(() => { load(); }, [load]);
 
   const startFast = async () => {
-    if (!profile?.id || starting) return;
+    if (!user || starting) return;
     setStarting(true);
     try {
-      const { data } = await getSupabase()
+      const { data } = await supabase
         .from('fasting_sessions')
-        .insert({ user_id: profile.id, protocol: selectedProtocol, started_at: new Date().toISOString() })
+        .insert({ user_id: user.id, protocol: selectedProtocol, started_at: new Date().toISOString() })
         .select().single();
       if (data) {
         setActiveFast(data as FastingSession);
@@ -473,11 +475,11 @@ export default function DashboardPage() {
   };
 
   const handleBottomSheetDone = async (emoji: number | null, memo: string) => {
-    if (!bottomSheet || !profile?.id) return;
+    if (!bottomSheet || !user) return;
     setBottomSheet(null);
     // Save a health entry to mark it done today
-    await getSupabase().from('health_entries').upsert({
-      user_id: profile.id,
+    await supabase.from('health_entries').upsert({
+      user_id: user.id,
       entry_date: today,
       metric: bottomSheet.key,
       value: emoji ?? 1,

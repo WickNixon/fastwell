@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 
 const TODAY = new Date().toISOString().split('T')[0];
@@ -15,7 +16,8 @@ const INTENSITIES = [
 ];
 
 export default function TrackExercisePage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const supabase = createClient();
   const router = useRouter();
   const [type, setType] = useState('Walk');
   const [duration, setDuration] = useState<number | null>(null);
@@ -41,12 +43,12 @@ export default function TrackExercisePage() {
   }, [profile]);
 
   const save = async () => {
-    if (!duration || !profile?.id || saving) return;
+    if (!duration || !user || saving) return;
     setSaving(true);
     const valueText = intensity ? `${type}|${intensity}` : type;
-    const { error } = await getSupabase().from('health_entries')
+    const { error } = await supabase.from('health_entries')
       .upsert({
-        user_id: profile.id, entry_date: TODAY, metric: 'exercise_minutes',
+        user_id: user.id, entry_date: TODAY, metric: 'exercise_minutes',
         value: duration, value_text: valueText, unit: 'minutes', source: 'manual',
       }, { onConflict: 'user_id,entry_date,metric,source' });
     if (error) {

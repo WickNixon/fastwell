@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 
 const TODAY = new Date().toISOString().split('T')[0];
@@ -10,7 +11,8 @@ const HOURS_OPTIONS = [5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9];
 const QUALITY_LABELS = ['', 'Poor', 'Restless', 'Okay', 'Good', 'Great'];
 
 export default function TrackSleepPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const supabase = createClient();
   const router = useRouter();
   const [hours, setHours] = useState<number | null>(null);
   const [quality, setQuality] = useState<number | null>(null);
@@ -31,16 +33,15 @@ export default function TrackSleepPage() {
   }, [profile]);
 
   const save = async () => {
-    if (!profile?.id || !hours || saving) return;
+    if (!user || !hours || saving) return;
     setSaving(true);
-    const sb = getSupabase();
     const [r1, r2] = await Promise.all([
-      sb.from('health_entries').upsert({
-        user_id: profile.id, entry_date: TODAY, metric: 'sleep_hours',
+      supabase.from('health_entries').upsert({
+        user_id: user.id, entry_date: TODAY, metric: 'sleep_hours',
         value: hours, unit: 'hours', source: 'manual',
       }, { onConflict: 'user_id,entry_date,metric,source' }),
-      quality ? sb.from('health_entries').upsert({
-        user_id: profile.id, entry_date: TODAY, metric: 'sleep_quality',
+      quality ? supabase.from('health_entries').upsert({
+        user_id: user.id, entry_date: TODAY, metric: 'sleep_quality',
         value: quality, unit: 'scale_1_5', source: 'manual',
       }, { onConflict: 'user_id,entry_date,metric,source' }) : Promise.resolve({ error: null }),
     ]);

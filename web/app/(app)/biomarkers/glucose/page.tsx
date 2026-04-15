@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { Biomarker } from '@/lib/types';
 
 export default function GlucosePage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const supabase = createClient();
   const router = useRouter();
   const [unit, setUnit] = useState<'mmol' | 'mgdl'>('mmol');
   const [value, setValue] = useState('');
@@ -28,10 +30,10 @@ export default function GlucosePage() {
   useEffect(() => { load(); }, [load]);
 
   const save = async () => {
-    if (!value || !profile?.id || saving) return;
+    if (!value || !user || saving) return;
     setSaving(true);
-    const { error } = await getSupabase().from('biomarkers').insert({
-      user_id: profile.id,
+    const { error } = await supabase.from('biomarkers').insert({
+      user_id: user.id,
       marker: 'blood_glucose',
       value: parseFloat(value),
       unit: unit === 'mmol' ? 'mmol/L' : 'mg/dL',

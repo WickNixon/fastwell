@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { Supplement } from '@/lib/types';
 
@@ -22,7 +23,8 @@ function typeLabel(value: string) {
 }
 
 export default function SupplementsPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const supabase = createClient();
   const router = useRouter();
   const [items, setItems] = useState<Supplement[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -45,10 +47,10 @@ export default function SupplementsPage() {
   useEffect(() => { load(); }, [load]);
 
   const save = async () => {
-    if (!name || !profile?.id || saving) return;
+    if (!name || !user || saving) return;
     setSaving(true);
-    const { error } = await getSupabase().from('supplements').insert({
-      user_id: profile.id, name, type, dose: dose || null, frequency, delivery, is_active: true,
+    const { error } = await supabase.from('supplements').insert({
+      user_id: user.id, name, type, dose: dose || null, frequency, delivery, is_active: true,
     });
     if (error) {
       setFeedback({ ok: false, msg: error.message });

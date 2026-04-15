@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { SymptomLog } from '@/lib/types';
 
@@ -24,7 +25,8 @@ const SYMPTOMS = [
 ];
 
 export default function TrackSymptomsPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const supabase = createClient();
   const router = useRouter();
   const [logged, setLogged] = useState<SymptomLog[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -54,23 +56,23 @@ export default function TrackSymptomsPage() {
   };
 
   const save = async () => {
-    if (!profile?.id || saving) return;
+    if (!user || saving) return;
     setSaving(true);
 
     // Delete any existing for today so we can re-insert cleanly
     if (logged.length > 0) {
-      await getSupabase().from('symptoms_log').delete().eq('user_id', profile.id).eq('entry_date', TODAY);
+      await supabase.from('symptoms_log').delete().eq('user_id', user.id).eq('entry_date', TODAY);
     }
 
     if (selected.size > 0) {
       const rows = Array.from(selected).map(symptom => ({
-        user_id: profile.id,
+        user_id: user.id,
         entry_date: TODAY,
         symptom,
         severity: 3,
         notes: notes || null,
       }));
-      const { error } = await getSupabase().from('symptoms_log').insert(rows);
+      const { error } = await supabase.from('symptoms_log').insert(rows);
       if (error) {
         setFeedback({ ok: false, msg: error.message });
         setSaving(false);

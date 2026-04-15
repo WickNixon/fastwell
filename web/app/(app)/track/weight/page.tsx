@@ -3,13 +3,15 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { HealthEntry } from '@/lib/types';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
 export default function TrackWeightPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const supabase = createClient();
   const router = useRouter();
   const [value, setValue] = useState('');
   const [history, setHistory] = useState<HealthEntry[]>([]);
@@ -31,10 +33,10 @@ export default function TrackWeightPage() {
   }, [profile]);
 
   const handleSave = async () => {
-    if (!value || !profile?.id || saving) return;
+    if (!value || !user || saving) return;
     setSaving(true);
-    const { error } = await getSupabase().from('health_entries').upsert({
-      user_id: profile.id,
+    const { error } = await supabase.from('health_entries').upsert({
+      user_id: user.id,
       entry_date: TODAY,
       metric: 'weight',
       value: parseFloat(value),
@@ -46,8 +48,8 @@ export default function TrackWeightPage() {
     } else {
       setFeedback({ ok: true, msg: 'Saved' });
       setTimeout(() => setFeedback(null), 1500);
-      const { data } = await getSupabase()
-        .from('health_entries').select('*').eq('user_id', profile.id).eq('metric', 'weight')
+      const { data } = await supabase
+        .from('health_entries').select('*').eq('user_id', user.id).eq('metric', 'weight')
         .order('entry_date', { ascending: false }).limit(10);
       setHistory(data ?? []);
     }

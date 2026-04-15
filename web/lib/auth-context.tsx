@@ -1,131 +1,85 @@
-'use client';
+'use client'
 
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Session, User } from '@supabase/supabase-js';
-import { getSupabase } from './supabase-browser';
-import { setCachedUserId } from './get-user-id';
-import type { Profile } from './types';
+import React, { createContext, useContext, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import type { User } from '@supabase/supabase-js'
+import { createClient } from './supabase'
+import type { Profile } from './types'
 
 interface AuthContextType {
-  session: Session | null;
-  user: User | null;
-  profile: Profile | null;
-  loading: boolean;
-  signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
+  user: User | null
+  profile: Profile | null
+  loading: boolean
+  signOut: () => Promise<void>
+  refreshProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
-  session: null,
   user: null,
   profile: null,
   loading: true,
   signOut: async () => {},
   refreshProfile: async () => {},
-});
+})
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
-  const supabase = getSupabase();
-  const loadingDone = useRef(false);
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+  const supabase = createClient()
 
-  const markLoaded = () => {
-    if (!loadingDone.current) {
-      loadingDone.current = true;
-      setLoading(false);
-    }
-  };
-
-  const fetchProfile = async (userId: string): Promise<Profile | null> => {
+  const fetchProfile = async (userId: string) => {
     try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-      if (data) setProfile(data as Profile);
-      return data as Profile | null;
-    } catch {
-      return null;
-    }
-  };
+      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
+      if (data) setProfile(data as Profile)
+    } catch {}
+  }
 
   useEffect(() => {
-    // Safety net: if auth init takes more than 5 seconds, unblock the UI anyway
-    const timeout = setTimeout(() => markLoaded(), 5000);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null)
+      if (session?.user) fetchProfile(session.user.id)
+      setLoading(false)
+    })
 
-    supabase.auth.getSession()
-      .then(async ({ data: { session } }) => {
-        setCachedUserId(session?.user?.id ?? null);
-        setSession(session);
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        }
-      })
-      .catch(() => {
-        // getSession failed — treat as unauthenticated
-      })
-      .finally(() => {
-        clearTimeout(timeout);
-        markLoaded();
-      });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+      if (session?.user) fetchProfile(session.user.id)
+      else setProfile(null)
+      setLoading(false)
+    })
 
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setCachedUserId(session?.user?.id ?? null);
-      setSession(session);
-      if (session?.user) {
-        await fetchProfile(session.user.id);
-      } else {
-        setProfile(null);
-      }
-      // If INITIAL_SESSION fires before getSession resolves, also unblock
-      if (event === 'INITIAL_SESSION') markLoaded();
-    });
-
-    return () => {
-      clearTimeout(timeout);
-      listener.subscription.unsubscribe();
-    };
-  }, []);
+    return () => subscription.unsubscribe()
+  }, [])
 
   // Apply theme preference to html element
   useEffect(() => {
-    if (!profile) return;
-    const pref = profile.theme_preference;
+    if (!profile) return
+    const pref = profile.theme_preference
     if (pref === 'light' || pref === 'dark') {
-      document.documentElement.setAttribute('data-theme', pref);
+      document.documentElement.setAttribute('data-theme', pref)
     } else {
-      document.documentElement.removeAttribute('data-theme');
+      document.documentElement.removeAttribute('data-theme')
     }
-  }, [profile?.theme_preference]);
+  }, [profile?.theme_preference])
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setSession(null);
-    setProfile(null);
-    router.push('/login');
-  };
+    await supabase.auth.signOut()
+    setUser(null)
+    setProfile(null)
+    router.push('/login')
+  }
 
   const refreshProfile = async () => {
-    if (session?.user) await fetchProfile(session.user.id);
-  };
+    if (user) await fetchProfile(user.id)
+  }
 
   return (
-    <AuthContext.Provider value={{
-      session,
-      user: session?.user ?? null,
-      profile,
-      loading,
-      signOut,
-      refreshProfile,
-    }}>
+    <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
-  );
+  )
 }
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => useContext(AuthContext)
