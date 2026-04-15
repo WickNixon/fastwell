@@ -70,6 +70,8 @@ function CalendarStrip({ completedDates }: { completedDates: Set<string> }) {
 
   const todayStr = isoDate(today);
 
+  const DAY_ABBRS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
   return (
     <div
       style={{ marginBottom: 24 }}
@@ -88,19 +90,29 @@ function CalendarStrip({ completedDates }: { completedDates: Set<string> }) {
           return (
             <div
               key={str}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 36, height: 36, borderRadius: '50%', margin: '0 auto',
-                backgroundColor: isToday ? '#5C8A34' : hasData ? '#EAF3DC' : 'transparent',
-                border: isToday ? 'none' : hasData ? 'none' : '1.5px solid #C8DFB0',
-              }}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}
             >
               <span style={{
-                fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 13,
-                color: isToday ? '#FFFFFF' : hasData ? '#5C8A34' : '#C8DFB0',
+                fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 11,
+                color: '#7A9A6A',
               }}>
-                {d.getDate()}
+                {DAY_ABBRS[d.getDay()]}
               </span>
+              <div
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 36, height: 36, borderRadius: '50%',
+                  backgroundColor: isToday ? '#5C8A34' : hasData ? '#EAF3DC' : 'transparent',
+                  border: isToday ? 'none' : hasData ? 'none' : '1.5px solid #C8DFB0',
+                }}
+              >
+                <span style={{
+                  fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 13,
+                  color: isToday ? '#FFFFFF' : hasData ? '#5C8A34' : '#C8DFB0',
+                }}>
+                  {d.getDate()}
+                </span>
+              </div>
             </div>
           );
         })}
@@ -505,8 +517,8 @@ export default function DashboardPage() {
   return (
     <div className="page page-top">
       {/* Greeting */}
-      <h1 className="h1 mb-2">{greeting}{profile?.first_name ? `, ${profile.first_name}` : ''}.</h1>
-      <p className="body-sm mb-20" style={{ color: 'var(--text-muted)' }}>{dateLabel}</p>
+      <h1 className="h1 mb-2" style={{ textAlign: 'center' }}>{greeting}{profile?.first_name ? `, ${profile.first_name}` : ''}.</h1>
+      <p className="body-sm mb-20" style={{ color: 'var(--text-muted)', textAlign: 'center' }}>{dateLabel}</p>
 
       {/* 7-day Calendar Strip */}
       <CalendarStrip completedDates={completedDates} />
