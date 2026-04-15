@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
-import { getAuthUserId } from '@/lib/get-user-id';
 import type { Biomarker } from '@/lib/types';
 
 export default function HbA1cPage() {
@@ -32,11 +31,10 @@ export default function HbA1cPage() {
   useEffect(() => { load(); }, [load]);
 
   const save = async () => {
-    const userId = await getAuthUserId();
-    if (!value || !userId || saving) return;
+    if (!value || !profile?.id || saving) return;
     setSaving(true);
     const { error } = await getSupabase().from('biomarkers').insert({
-      user_id: userId,
+      user_id: profile.id,
       marker: 'hba1c',
       value: parseFloat(value),
       unit: '%',

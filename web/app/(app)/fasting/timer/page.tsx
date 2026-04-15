@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
-import { getAuthUserId } from '@/lib/get-user-id';
 import type { FastingSession } from '@/lib/types';
 
 const PROTOCOLS = [
@@ -55,13 +54,12 @@ export default function FastingTimerPage() {
   }, [profile, startTick]);
 
   const startFast = async () => {
-    const userId = await getAuthUserId();
-    if (!userId || starting) return;
+    if (!profile?.id || starting) return;
     setStarting(true);
     setError('');
     const { data, error: err } = await getSupabase()
       .from('fasting_sessions')
-      .insert({ user_id: userId, protocol: selectedProtocol, started_at: new Date().toISOString() })
+      .insert({ user_id: profile.id, protocol: selectedProtocol, started_at: new Date().toISOString() })
       .select()
       .single();
     if (err) {

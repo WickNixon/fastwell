@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
-import { getAuthUserId } from '@/lib/get-user-id';
 import type { Biomarker } from '@/lib/types';
 
 // Plain language zones per changelog
@@ -38,11 +37,10 @@ export default function KetonesPage() {
   useEffect(() => { load(); }, [load]);
 
   const save = async () => {
-    const userId = await getAuthUserId();
-    if (!value || !userId || saving) return;
+    if (!value || !profile?.id || saving) return;
     setSaving(true);
     const { error } = await getSupabase().from('biomarkers').insert({
-      user_id: userId, marker: 'ketones_blood', value: parseFloat(value), unit: 'mmol/L', reading_date: date,
+      user_id: profile.id, marker: 'ketones_blood', value: parseFloat(value), unit: 'mmol/L', reading_date: date,
     });
     if (error) {
       setFeedback({ ok: false, msg: error.message });

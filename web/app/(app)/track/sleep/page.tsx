@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
-import { getAuthUserId } from '@/lib/get-user-id';
 
 const TODAY = new Date().toISOString().split('T')[0];
 const HOURS_OPTIONS = [5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9];
@@ -32,17 +31,16 @@ export default function TrackSleepPage() {
   }, [profile]);
 
   const save = async () => {
-    const userId = await getAuthUserId();
-    if (!userId || !hours || saving) return;
+    if (!profile?.id || !hours || saving) return;
     setSaving(true);
     const sb = getSupabase();
     const [r1, r2] = await Promise.all([
       sb.from('health_entries').upsert({
-        user_id: userId, entry_date: TODAY, metric: 'sleep_hours',
+        user_id: profile.id, entry_date: TODAY, metric: 'sleep_hours',
         value: hours, unit: 'hours', source: 'manual',
       }, { onConflict: 'user_id,entry_date,metric,source' }),
       quality ? sb.from('health_entries').upsert({
-        user_id: userId, entry_date: TODAY, metric: 'sleep_quality',
+        user_id: profile.id, entry_date: TODAY, metric: 'sleep_quality',
         value: quality, unit: 'scale_1_5', source: 'manual',
       }, { onConflict: 'user_id,entry_date,metric,source' }) : Promise.resolve({ error: null }),
     ]);

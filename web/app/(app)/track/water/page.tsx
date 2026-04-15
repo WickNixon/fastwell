@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
-import { getAuthUserId } from '@/lib/get-user-id';
-
 const TODAY = new Date().toISOString().split('T')[0];
 
 export default function TrackWaterPage() {
@@ -29,13 +27,12 @@ export default function TrackWaterPage() {
   }, [profile]);
 
   const save = async (ml: number) => {
-    const userId = await getAuthUserId();
-    if (!userId || saving) return;
+    if (!profile?.id || saving) return;
     setSaving(true);
     const { error } = await getSupabase()
       .from('health_entries')
       .upsert({
-        user_id: userId,
+        user_id: profile.id,
         entry_date: TODAY,
         metric: 'water_ml',
         value: ml,
