@@ -12,33 +12,33 @@ export default function TrackSleepPage() {
   const { profile } = useAuth();
   const router = useRouter();
   const [selected, setSelected] = useState<number | null>(null);
-  const [entryId, setEntryId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
   useEffect(() => {
     if (!profile) return;
-    getSupabase().from('health_entries').select('id,value')
-      .eq('user_id', profile.id).eq('entry_date', TODAY).eq('metric', 'sleep_hours')
+    getSupabase().from('health_entries').select('value')
+      .eq('user_id', profile.id).eq('entry_date', TODAY).eq('metric', 'sleep_hours').eq('source', 'manual')
       .maybeSingle()
-      .then(({ data }) => { if (data) { setSelected(data.value); setEntryId(data.id); } });
+      .then(({ data }) => { if (data) setSelected(data.value); });
   }, [profile]);
 
   const save = async (hours: number) => {
-    if (!profile) return;
+    if (!profile || saving) return;
     setSaving(true);
     setSelected(hours);
-    if (entryId) {
-      await getSupabase().from('health_entries').update({ value: hours }).eq('id', entryId);
+    const { error } = await getSupabase().from('health_entries')
+      .upsert({
+        user_id: profile.id, entry_date: TODAY, metric: 'sleep_hours',
+        value: hours, unit: 'hours', source: 'manual',
+      }, { onConflict: 'user_id,entry_date,metric,source' });
+    if (error) {
+      setFeedback({ ok: false, msg: error.message });
     } else {
-      const { data } = await getSupabase().from('health_entries')
-        .insert({ user_id: profile.id, entry_date: TODAY, metric: 'sleep_hours', value: hours, unit: 'hours', source: 'manual' })
-        .select('id').single();
-      if (data) setEntryId(data.id);
+      setFeedback({ ok: true, msg: 'Logged' });
+      setTimeout(() => setSaving(false), 0);
     }
-    setSaved(true);
     setSaving(false);
-    setTimeout(() => setSaved(false), 2000);
   };
 
   return (
@@ -47,9 +47,15 @@ export default function TrackSleepPage() {
       <h1 className="h1 mb-8">Sleep</h1>
       <p className="body-sm mb-24">How many hours did you sleep last night?</p>
 
-      {saved && (
-        <div style={{ background: 'var(--primary-pale)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: 'var(--primary)', fontFamily: 'Lato, sans-serif', fontSize: 14 }}>
-          ✓ Logged
+      {feedback && (
+        <div style={{
+          background: feedback.ok ? 'var(--primary-pale)' : '#FFF3F3',
+          border: `1px solid ${feedback.ok ? 'var(--border)' : '#FFCDD2'}`,
+          color: feedback.ok ? 'var(--primary)' : '#C62828',
+          borderRadius: 10, padding: '12px 16px', marginBottom: 16,
+          fontSize: 14, fontFamily: 'Lato, sans-serif',
+        }}>
+          {feedback.ok ? `✓ ${feedback.msg}` : feedback.msg}
         </div>
       )}
 
@@ -60,14 +66,10 @@ export default function TrackSleepPage() {
             onClick={() => save(h)}
             disabled={saving}
             style={{
-              padding: '16px 10px',
-              borderRadius: 12,
+              padding: '16px 10px', borderRadius: 12,
               border: `2px solid ${selected === h ? 'var(--primary)' : 'var(--border)'}`,
               backgroundColor: selected === h ? 'var(--primary-pale)' : 'var(--surface)',
-              fontFamily: 'Montserrat, sans-serif',
-              fontWeight: 700,
-              fontSize: 18,
-              cursor: 'pointer',
+              fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 18, cursor: 'pointer',
               color: selected === h ? 'var(--primary)' : 'var(--text)',
             }}
           >

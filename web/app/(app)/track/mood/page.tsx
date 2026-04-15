@@ -18,38 +18,52 @@ export default function TrackMoodPage() {
   const { profile } = useAuth();
   const router = useRouter();
   const [selected, setSelected] = useState<number | null>(null);
-  const [entryId, setEntryId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
   useEffect(() => {
     if (!profile) return;
-    getSupabase().from('health_entries').select('id,value')
-      .eq('user_id', profile.id).eq('entry_date', TODAY).eq('metric', 'mood')
+    getSupabase().from('health_entries').select('value')
+      .eq('user_id', profile.id).eq('entry_date', TODAY).eq('metric', 'mood').eq('source', 'manual')
       .maybeSingle()
-      .then(({ data }) => { if (data) { setSelected(data.value); setEntryId(data.id); } });
+      .then(({ data }) => { if (data) setSelected(data.value); });
   }, [profile]);
 
   const save = async (val: number) => {
     if (!profile || saving) return;
     setSaving(true);
     setSelected(val);
-    if (entryId) {
-      await getSupabase().from('health_entries').update({ value: val }).eq('id', entryId);
+    const { error } = await getSupabase().from('health_entries')
+      .upsert({
+        user_id: profile.id, entry_date: TODAY, metric: 'mood',
+        value: val, unit: 'scale_1_5', source: 'manual',
+      }, { onConflict: 'user_id,entry_date,metric,source' });
+    if (error) {
+      setFeedback({ ok: false, msg: error.message });
     } else {
-      const { data } = await getSupabase().from('health_entries')
-        .insert({ user_id: profile.id, entry_date: TODAY, metric: 'mood', value: val, unit: 'scale_1_5', source: 'manual' })
-        .select('id').single();
-      if (data) setEntryId(data.id);
+      setFeedback({ ok: true, msg: 'Saved' });
+      setTimeout(() => { setFeedback(null); router.back(); }, 1000);
     }
     setSaving(false);
-    setTimeout(() => router.back(), 800);
   };
 
   return (
     <div className="page page-top">
       <button onClick={() => router.back()} style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Lato, sans-serif' }}>← Back</button>
       <h1 className="h1 mb-8">Mood</h1>
-      <p className="body-sm mb-32">How are you feeling today?</p>
+      <p className="body-sm mb-32">How are you feeling emotionally today?</p>
+
+      {feedback && (
+        <div style={{
+          background: feedback.ok ? 'var(--primary-pale)' : '#FFF3F3',
+          border: `1px solid ${feedback.ok ? 'var(--border)' : '#FFCDD2'}`,
+          color: feedback.ok ? 'var(--primary)' : '#C62828',
+          borderRadius: 10, padding: '12px 16px', marginBottom: 16,
+          fontSize: 14, fontFamily: 'Lato, sans-serif',
+        }}>
+          {feedback.ok ? `✓ ${feedback.msg}` : feedback.msg}
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {MOODS.map(m => (

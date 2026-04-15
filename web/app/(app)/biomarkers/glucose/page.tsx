@@ -12,14 +12,15 @@ export default function GlucosePage() {
   const [unit, setUnit] = useState<'mmol' | 'mgdl'>('mmol');
   const [value, setValue] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [notes, setNotes] = useState('');
   const [history, setHistory] = useState<Biomarker[]>([]);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!profile) return;
     const { data } = await getSupabase()
-      .from('biomarkers').select('*').eq('user_id', profile.id).eq('marker', 'glucose')
+      .from('biomarkers').select('*').eq('user_id', profile.id).eq('marker', 'blood_glucose')
       .order('reading_date', { ascending: false }).limit(20);
     setHistory(data ?? []);
   }, [profile]);
@@ -27,19 +28,26 @@ export default function GlucosePage() {
   useEffect(() => { load(); }, [load]);
 
   const save = async () => {
-    if (!value || !profile) return;
+    if (!value || !profile || saving) return;
     setSaving(true);
-    await getSupabase().from('biomarkers').insert({
-      user_id: profile.id, marker: 'glucose',
+    const { error } = await getSupabase().from('biomarkers').insert({
+      user_id: profile.id,
+      marker: 'blood_glucose',
       value: parseFloat(value),
       unit: unit === 'mmol' ? 'mmol/L' : 'mg/dL',
       reading_date: date,
+      notes: notes || null,
     });
-    setValue('');
-    setSaved(true);
+    if (error) {
+      setFeedback({ ok: false, msg: error.message });
+    } else {
+      setValue('');
+      setNotes('');
+      setFeedback({ ok: true, msg: 'Reading saved' });
+      setTimeout(() => setFeedback(null), 1500);
+      await load();
+    }
     setSaving(false);
-    await load();
-    setTimeout(() => setSaved(false), 2000);
   };
 
   const latest = history[0];
@@ -51,13 +59,25 @@ export default function GlucosePage() {
       <h1 className="h1 mb-4">Blood Glucose</h1>
       <p className="body-sm mb-24">Normal fasting range: 3.9–5.5 mmol/L</p>
 
+      {feedback && (
+        <div style={{
+          background: feedback.ok ? 'var(--primary-pale)' : '#FFF3F3',
+          border: `1px solid ${feedback.ok ? 'var(--border)' : '#FFCDD2'}`,
+          color: feedback.ok ? 'var(--primary)' : '#C62828',
+          borderRadius: 10, padding: '12px 16px', marginBottom: 16,
+          fontSize: 14, fontFamily: 'Lato, sans-serif',
+        }}>
+          {feedback.ok ? `✓ ${feedback.msg}` : feedback.msg}
+        </div>
+      )}
+
       {latest && (
         <div className="card-lg mb-24" style={{ background: isNormal ? 'var(--primary-pale)' : '#FFF0E6', border: `1px solid ${isNormal ? 'var(--border)' : 'var(--accent)'}` }}>
           <p className="section-label mb-4">Latest reading</p>
           <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 36, color: isNormal ? 'var(--primary)' : 'var(--accent)', lineHeight: 1 }}>
             {latest.value} <span style={{ fontSize: 18 }}>{latest.unit}</span>
           </p>
-          <p className="body-sm mt-4">{isNormal ? 'Within normal range' : 'Outside normal range'}</p>
+          <p className="body-sm mt-4">{isNormal ? 'Within normal range' : 'Outside normal fasting range'}</p>
         </div>
       )}
 
@@ -81,11 +101,15 @@ export default function GlucosePage() {
           <input className="input" type="number" step="0.1" placeholder={unit === 'mmol' ? 'e.g. 5.2' : 'e.g. 94'} value={value} onChange={e => setValue(e.target.value)} />
         </div>
         <div className="input-group">
-          <label className="input-label">Date & time</label>
+          <label className="input-label">Date</label>
           <input className="input" type="date" value={date} onChange={e => setDate(e.target.value)} />
         </div>
+        <div className="input-group">
+          <label className="input-label">Notes (optional)</label>
+          <input className="input" type="text" placeholder="e.g. fasting, post-meal" value={notes} onChange={e => setNotes(e.target.value)} />
+        </div>
         <button className="btn btn-primary" onClick={save} disabled={!value || saving}>
-          {saved ? '✓ Saved' : saving ? 'Saving…' : 'Save reading'}
+          {saving ? 'Saving…' : 'Save reading'}
         </button>
       </div>
 

@@ -14,7 +14,7 @@ export default function HbA1cPage() {
   const [notes, setNotes] = useState('');
   const [history, setHistory] = useState<Biomarker[]>([]);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!profile) return;
@@ -31,9 +31,9 @@ export default function HbA1cPage() {
   useEffect(() => { load(); }, [load]);
 
   const save = async () => {
-    if (!value || !profile) return;
+    if (!value || !profile || saving) return;
     setSaving(true);
-    await getSupabase().from('biomarkers').insert({
+    const { error } = await getSupabase().from('biomarkers').insert({
       user_id: profile.id,
       marker: 'hba1c',
       value: parseFloat(value),
@@ -41,12 +41,16 @@ export default function HbA1cPage() {
       reading_date: date,
       notes: notes || null,
     });
-    setValue('');
-    setNotes('');
-    setSaved(true);
+    if (error) {
+      setFeedback({ ok: false, msg: error.message });
+    } else {
+      setValue('');
+      setNotes('');
+      setFeedback({ ok: true, msg: 'Reading saved' });
+      setTimeout(() => setFeedback(null), 1500);
+      await load();
+    }
     setSaving(false);
-    await load();
-    setTimeout(() => setSaved(false), 2000);
   };
 
   const latest = history[0];
@@ -59,6 +63,18 @@ export default function HbA1cPage() {
       <h1 className="h1 mb-4">HbA1c</h1>
       <p className="body-sm mb-24">Your 3-month blood sugar average</p>
 
+      {feedback && (
+        <div style={{
+          background: feedback.ok ? 'var(--primary-pale)' : '#FFF3F3',
+          border: `1px solid ${feedback.ok ? 'var(--border)' : '#FFCDD2'}`,
+          color: feedback.ok ? 'var(--primary)' : '#C62828',
+          borderRadius: 10, padding: '12px 16px', marginBottom: 16,
+          fontSize: 14, fontFamily: 'Lato, sans-serif',
+        }}>
+          {feedback.ok ? `✓ ${feedback.msg}` : feedback.msg}
+        </div>
+      )}
+
       {latest && (
         <div className="card-lg mb-24" style={{ background: 'var(--primary-pale)', border: '1px solid var(--border)' }}>
           <p className="section-label mb-4">Latest reading</p>
@@ -68,7 +84,7 @@ export default function HbA1cPage() {
           <p className="body-sm mt-4">{new Date(latest.reading_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
           {improved && (
             <p style={{ marginTop: 8, color: 'var(--primary)', fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13 }}>
-              ↓ Down from {first.value}% since you started
+              ↓ Down from {first.value}% — your hard work is showing up in your results
             </p>
           )}
         </div>
@@ -89,7 +105,7 @@ export default function HbA1cPage() {
           <input className="input" type="text" placeholder="e.g. post-fasting, GP appointment" value={notes} onChange={e => setNotes(e.target.value)} />
         </div>
         <button className="btn btn-primary" onClick={save} disabled={!value || saving}>
-          {saved ? '✓ Saved' : saving ? 'Saving…' : 'Save reading'}
+          {saving ? 'Saving…' : 'Save reading'}
         </button>
       </div>
 

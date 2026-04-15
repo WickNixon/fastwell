@@ -5,46 +5,52 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
 
-const GOALS = [500, 1000, 1500, 2000, 2500, 3000];
 const TODAY = new Date().toISOString().split('T')[0];
 
 export default function TrackWaterPage() {
   const { profile } = useAuth();
   const router = useRouter();
   const [current, setCurrent] = useState(0);
-  const [entryId, setEntryId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
   useEffect(() => {
     if (!profile) return;
     getSupabase()
       .from('health_entries')
-      .select('id, value')
+      .select('value')
       .eq('user_id', profile.id)
       .eq('entry_date', TODAY)
       .eq('metric', 'water_ml')
+      .eq('source', 'manual')
       .maybeSingle()
-      .then(({ data }) => {
-        if (data) { setCurrent(data.value ?? 0); setEntryId(data.id); }
-      });
+      .then(({ data }) => { if (data) setCurrent(data.value ?? 0); });
   }, [profile]);
 
   const save = async (ml: number) => {
-    if (!profile) return;
+    if (!profile || saving) return;
     setSaving(true);
-    const entry = { user_id: profile.id, entry_date: TODAY, metric: 'water_ml', value: ml, unit: 'ml', source: 'manual' };
-    if (entryId) {
-      await getSupabase().from('health_entries').update({ value: ml }).eq('id', entryId);
+    const { error } = await getSupabase()
+      .from('health_entries')
+      .upsert({
+        user_id: profile.id,
+        entry_date: TODAY,
+        metric: 'water_ml',
+        value: ml,
+        unit: 'ml',
+        source: 'manual',
+      }, { onConflict: 'user_id,entry_date,metric,source' });
+    if (error) {
+      setFeedback({ ok: false, msg: error.message });
     } else {
-      const { data } = await getSupabase().from('health_entries').insert(entry).select('id').single();
-      if (data) setEntryId(data.id);
+      setCurrent(ml);
+      setFeedback({ ok: true, msg: 'Saved' });
+      setTimeout(() => setFeedback(null), 1500);
     }
-    setCurrent(ml);
     setSaving(false);
   };
 
   const add = (ml: number) => save(current + ml);
-
   const pct = Math.min((current / 2000) * 100, 100);
 
   return (
@@ -55,7 +61,18 @@ export default function TrackWaterPage() {
       <h1 className="h1 mb-4">Water</h1>
       <p className="body-sm mb-24">Today's intake</p>
 
-      {/* Visual fill indicator */}
+      {feedback && (
+        <div style={{
+          background: feedback.ok ? 'var(--primary-pale)' : '#FFF3F3',
+          border: `1px solid ${feedback.ok ? 'var(--border)' : '#FFCDD2'}`,
+          color: feedback.ok ? 'var(--primary)' : '#C62828',
+          borderRadius: 10, padding: '12px 16px', marginBottom: 16,
+          fontSize: 14, fontFamily: 'Lato, sans-serif',
+        }}>
+          {feedback.ok ? `✓ ${feedback.msg}` : feedback.msg}
+        </div>
+      )}
+
       <div style={{ textAlign: 'center', marginBottom: 32 }}>
         <div style={{ fontSize: 64 }}>💧</div>
         <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 36, color: 'var(--primary)', marginTop: 8 }}>
@@ -67,34 +84,31 @@ export default function TrackWaterPage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 24 }}>
-        {[250, 500, 750].map(ml => (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 24 }}>
+        {[250, 500, 750, 1000].map(ml => (
           <button
             key={ml}
             className="btn btn-outline btn-sm"
             onClick={() => add(ml)}
             disabled={saving}
           >
-            +{ml}ml
+            +{ml >= 1000 ? '1L' : `${ml}ml`}
           </button>
         ))}
       </div>
 
       <p className="section-label mb-12">Set a specific amount</p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-        {GOALS.map(ml => (
+        {[500, 1000, 1500, 2000, 2500, 3000].map(ml => (
           <button
             key={ml}
             onClick={() => save(ml)}
+            disabled={saving}
             style={{
-              padding: '12px 8px',
-              borderRadius: 10,
+              padding: '12px 8px', borderRadius: 10,
               border: `2px solid ${current === ml ? 'var(--primary)' : 'var(--border)'}`,
               backgroundColor: current === ml ? 'var(--primary-pale)' : 'var(--surface)',
-              fontFamily: 'Montserrat, sans-serif',
-              fontWeight: 600,
-              fontSize: 13,
-              cursor: 'pointer',
+              fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13, cursor: 'pointer',
               color: current === ml ? 'var(--primary)' : 'var(--text)',
             }}
           >

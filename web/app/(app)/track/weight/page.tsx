@@ -14,7 +14,7 @@ export default function TrackWeightPage() {
   const [value, setValue] = useState('');
   const [history, setHistory] = useState<HealthEntry[]>([]);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const unit = profile?.weight_unit ?? 'kg';
 
@@ -31,23 +31,27 @@ export default function TrackWeightPage() {
   }, [profile]);
 
   const handleSave = async () => {
-    if (!value || !profile) return;
+    if (!value || !profile || saving) return;
     setSaving(true);
-    await getSupabase().from('health_entries').upsert({
+    const { error } = await getSupabase().from('health_entries').upsert({
       user_id: profile.id,
       entry_date: TODAY,
       metric: 'weight',
       value: parseFloat(value),
       unit,
       source: 'manual',
-    }, { onConflict: 'user_id,entry_date,metric' });
-    setSaved(true);
+    }, { onConflict: 'user_id,entry_date,metric,source' });
+    if (error) {
+      setFeedback({ ok: false, msg: error.message });
+    } else {
+      setFeedback({ ok: true, msg: 'Saved' });
+      setTimeout(() => setFeedback(null), 1500);
+      const { data } = await getSupabase()
+        .from('health_entries').select('*').eq('user_id', profile.id).eq('metric', 'weight')
+        .order('entry_date', { ascending: false }).limit(10);
+      setHistory(data ?? []);
+    }
     setSaving(false);
-    setTimeout(() => setSaved(false), 2000);
-    const { data } = await getSupabase()
-      .from('health_entries').select('*').eq('user_id', profile.id).eq('metric', 'weight')
-      .order('entry_date', { ascending: false }).limit(10);
-    setHistory(data ?? []);
   };
 
   return (
@@ -57,6 +61,18 @@ export default function TrackWeightPage() {
       </button>
       <h1 className="h1 mb-24">Weight</h1>
 
+      {feedback && (
+        <div style={{
+          background: feedback.ok ? 'var(--primary-pale)' : '#FFF3F3',
+          border: `1px solid ${feedback.ok ? 'var(--border)' : '#FFCDD2'}`,
+          color: feedback.ok ? 'var(--primary)' : '#C62828',
+          borderRadius: 10, padding: '12px 16px', marginBottom: 16,
+          fontSize: 14, fontFamily: 'Lato, sans-serif',
+        }}>
+          {feedback.ok ? `✓ ${feedback.msg}` : feedback.msg}
+        </div>
+      )}
+
       <div className="card-lg mb-24">
         <p className="section-label mb-12">Log today</p>
         <div style={{ display: 'flex', gap: 10 }}>
@@ -64,7 +80,7 @@ export default function TrackWeightPage() {
             className="input"
             type="number"
             step="0.1"
-            placeholder={`e.g. 68.5`}
+            placeholder="e.g. 68.5"
             value={value}
             onChange={e => setValue(e.target.value)}
             style={{ flex: 1 }}
@@ -74,7 +90,7 @@ export default function TrackWeightPage() {
           </span>
         </div>
         <button className="btn btn-primary mt-12" onClick={handleSave} disabled={!value || saving}>
-          {saved ? '✓ Saved' : saving ? 'Saving…' : 'Save'}
+          {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
 

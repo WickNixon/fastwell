@@ -19,6 +19,8 @@ const SYMPTOMS = [
   { key: 'fatigue', label: 'Fatigue', icon: '😴' },
   { key: 'mood_swings', label: 'Mood swings', icon: '🌊' },
   { key: 'insomnia', label: 'Insomnia', icon: '🌙' },
+  { key: 'low_libido', label: 'Low libido', icon: '💚' },
+  { key: 'hair_thinning', label: 'Hair thinning', icon: '🪮' },
 ];
 
 export default function TrackSymptomsPage() {
@@ -26,11 +28,12 @@ export default function TrackSymptomsPage() {
   const router = useRouter();
   const [logged, setLogged] = useState<SymptomLog[]>([]);
   const [saving, setSaving] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!profile) return;
     const { data } = await getSupabase()
-      .from('symptom_logs')
+      .from('symptoms_log')
       .select('*')
       .eq('user_id', profile.id)
       .eq('entry_date', TODAY);
@@ -44,15 +47,25 @@ export default function TrackSymptomsPage() {
     setSaving(symptom);
     const existing = logged.find(l => l.symptom === symptom);
     if (existing) {
-      await getSupabase().from('symptom_logs').delete().eq('id', existing.id);
-      setLogged(prev => prev.filter(l => l.symptom !== symptom));
+      const { error } = await getSupabase().from('symptoms_log').delete().eq('id', existing.id);
+      if (error) {
+        setFeedback({ ok: false, msg: error.message });
+      } else {
+        setLogged(prev => prev.filter(l => l.symptom !== symptom));
+      }
     } else {
-      const { data } = await getSupabase()
-        .from('symptom_logs')
-        .insert({ user_id: profile.id, entry_date: TODAY, symptom, severity: 1 })
+      const { data, error } = await getSupabase()
+        .from('symptoms_log')
+        .insert({ user_id: profile.id, entry_date: TODAY, symptom, severity: 3 })
         .select()
         .single();
-      if (data) setLogged(prev => [...prev, data as SymptomLog]);
+      if (error) {
+        setFeedback({ ok: false, msg: error.message });
+      } else if (data) {
+        setLogged(prev => [...prev, data as SymptomLog]);
+        setFeedback({ ok: true, msg: 'Logged' });
+        setTimeout(() => setFeedback(null), 1500);
+      }
     }
     setSaving(null);
   };
@@ -64,6 +77,18 @@ export default function TrackSymptomsPage() {
       <button onClick={() => router.back()} style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Lato, sans-serif' }}>← Back</button>
       <h1 className="h1 mb-8">Symptoms</h1>
       <p className="body-sm mb-24">Tap to log any symptoms you're experiencing today.</p>
+
+      {feedback && (
+        <div style={{
+          background: feedback.ok ? 'var(--primary-pale)' : '#FFF3F3',
+          border: `1px solid ${feedback.ok ? 'var(--border)' : '#FFCDD2'}`,
+          color: feedback.ok ? 'var(--primary)' : '#C62828',
+          borderRadius: 10, padding: '12px 16px', marginBottom: 16,
+          fontSize: 14, fontFamily: 'Lato, sans-serif',
+        }}>
+          {feedback.ok ? `✓ ${feedback.msg}` : feedback.msg}
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {SYMPTOMS.map(s => {

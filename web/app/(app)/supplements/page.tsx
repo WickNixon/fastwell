@@ -6,9 +6,20 @@ import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { Supplement } from '@/lib/types';
 
-const TYPES = ['HRT', 'Bioidentical', 'Supplement', 'Medication', 'Other'];
-const FREQUENCIES = ['Daily', 'Twice daily', 'Weekly', 'As needed'];
+// DB values that match the CHECK constraint in the supplements table
+const TYPES: { label: string; value: string }[] = [
+  { label: 'Supplement', value: 'supplement' },
+  { label: 'HRT — Bioidentical', value: 'hrt_bioidentical' },
+  { label: 'HRT — Pharmaceutical', value: 'hrt_pharmaceutical' },
+  { label: 'Medication', value: 'medication' },
+  { label: 'Other', value: 'other' },
+];
+const FREQUENCIES = ['Once daily', 'Twice daily', 'Three times daily', 'Weekly', 'As needed'];
 const DELIVERY = ['Oral', 'Patch', 'Gel', 'Cream', 'Injection', 'Spray'];
+
+function typeLabel(value: string) {
+  return TYPES.find(t => t.value === value)?.label ?? value;
+}
 
 export default function SupplementsPage() {
   const { profile } = useAuth();
@@ -16,11 +27,12 @@ export default function SupplementsPage() {
   const [items, setItems] = useState<Supplement[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [name, setName] = useState('');
-  const [type, setType] = useState('Supplement');
+  const [type, setType] = useState('supplement');
   const [dose, setDose] = useState('');
-  const [frequency, setFrequency] = useState('Daily');
+  const [frequency, setFrequency] = useState('Once daily');
   const [delivery, setDelivery] = useState('Oral');
   const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!profile) return;
@@ -33,15 +45,21 @@ export default function SupplementsPage() {
   useEffect(() => { load(); }, [load]);
 
   const save = async () => {
-    if (!name || !profile) return;
+    if (!name || !profile || saving) return;
     setSaving(true);
-    await getSupabase().from('supplements').insert({
+    const { error } = await getSupabase().from('supplements').insert({
       user_id: profile.id, name, type, dose: dose || null, frequency, delivery, is_active: true,
     });
-    setName(''); setDose(''); setType('Supplement'); setFrequency('Daily'); setDelivery('Oral');
-    setShowModal(false);
+    if (error) {
+      setFeedback({ ok: false, msg: error.message });
+    } else {
+      setName(''); setDose(''); setType('supplement'); setFrequency('Once daily'); setDelivery('Oral');
+      setShowModal(false);
+      setFeedback({ ok: true, msg: 'Saved' });
+      setTimeout(() => setFeedback(null), 1500);
+      await load();
+    }
     setSaving(false);
-    await load();
   };
 
   const toggleActive = async (item: Supplement) => {
@@ -63,6 +81,18 @@ export default function SupplementsPage() {
         <button className="btn btn-primary btn-sm" style={{ width: 'auto', paddingLeft: 16, paddingRight: 16 }} onClick={() => setShowModal(true)}>+ Add</button>
       </div>
 
+      {feedback && (
+        <div style={{
+          background: feedback.ok ? 'var(--primary-pale)' : '#FFF3F3',
+          border: `1px solid ${feedback.ok ? 'var(--border)' : '#FFCDD2'}`,
+          color: feedback.ok ? 'var(--primary)' : '#C62828',
+          borderRadius: 10, padding: '12px 16px', marginBottom: 16,
+          fontSize: 14, fontFamily: 'Lato, sans-serif',
+        }}>
+          {feedback.ok ? `✓ ${feedback.msg}` : feedback.msg}
+        </div>
+      )}
+
       {active.length > 0 && (
         <div className="section">
           <p className="section-label mb-12">Active</p>
@@ -74,7 +104,7 @@ export default function SupplementsPage() {
               }}>
                 <div style={{ flex: 1 }}>
                   <p className="h3" style={{ fontSize: 15 }}>{s.name}</p>
-                  <p className="body-sm">{[s.type, s.dose, s.frequency].filter(Boolean).join(' · ')}</p>
+                  <p className="body-sm">{[s.type ? typeLabel(s.type) : null, s.dose, s.frequency].filter(Boolean).join(' · ')}</p>
                 </div>
                 <label className="toggle">
                   <input type="checkbox" checked={s.is_active} onChange={() => toggleActive(s)} />
@@ -98,7 +128,7 @@ export default function SupplementsPage() {
               }}>
                 <div style={{ flex: 1 }}>
                   <p className="h3" style={{ fontSize: 15 }}>{s.name}</p>
-                  <p className="body-sm">{[s.type, s.dose, s.frequency].filter(Boolean).join(' · ')}</p>
+                  <p className="body-sm">{[s.type ? typeLabel(s.type) : null, s.dose, s.frequency].filter(Boolean).join(' · ')}</p>
                 </div>
                 <label className="toggle">
                   <input type="checkbox" checked={s.is_active} onChange={() => toggleActive(s)} />
@@ -113,7 +143,7 @@ export default function SupplementsPage() {
       {items.length === 0 && (
         <div className="empty-state">
           <div className="empty-state-icon">💊</div>
-          <p className="h3">No supplements yet</p>
+          <p className="h3">Nothing here yet</p>
           <p className="body-sm">Add your HRT, bioidentical hormones, supplements, or medications.</p>
           <button className="btn btn-primary mt-16" style={{ maxWidth: 240 }} onClick={() => setShowModal(true)}>Add first item</button>
         </div>
@@ -123,7 +153,7 @@ export default function SupplementsPage() {
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
-            <h2 className="h2 mb-20">Add supplement</h2>
+            <h2 className="h2 mb-20">Add supplement or HRT</h2>
 
             <div className="input-group">
               <label className="input-label">Name</label>
@@ -134,13 +164,13 @@ export default function SupplementsPage() {
               <label className="input-label">Type</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {TYPES.map(t => (
-                  <button key={t} onClick={() => setType(t)} style={{
+                  <button key={t.value} onClick={() => setType(t.value)} style={{
                     padding: '7px 14px', borderRadius: 20,
-                    border: `1.5px solid ${type === t ? 'var(--primary)' : 'var(--border)'}`,
-                    backgroundColor: type === t ? 'var(--primary-pale)' : 'var(--surface)',
+                    border: `1.5px solid ${type === t.value ? 'var(--primary)' : 'var(--border)'}`,
+                    backgroundColor: type === t.value ? 'var(--primary-pale)' : 'var(--surface)',
                     fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 12,
-                    color: type === t ? 'var(--primary)' : 'var(--text)', cursor: 'pointer',
-                  }}>{t}</button>
+                    color: type === t.value ? 'var(--primary)' : 'var(--text)', cursor: 'pointer',
+                  }}>{t.label}</button>
                 ))}
               </div>
             </div>

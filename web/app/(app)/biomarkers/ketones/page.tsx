@@ -6,18 +6,15 @@ import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { Biomarker } from '@/lib/types';
 
+// Plain language zones per changelog
 const ZONES = [
-  { label: 'Glucose burning', range: '0–0.4', color: '#7A9A6A' },
-  { label: 'Light ketosis', range: '0.4–1.5', color: '#5C8A34' },
-  { label: 'Nutritional ketosis', range: '1.5–3.0', color: '#3D6020' },
-  { label: 'Deep ketosis', range: '3.0+', color: '#D06820' },
+  { label: 'Not yet in ketosis', min: 0, max: 0.5, color: '#7A9A6A' },
+  { label: 'Nutritional ketosis — fat burning zone ✓', min: 0.5, max: 3.0, color: '#5C8A34' },
+  { label: 'Deep ketosis', min: 3.0, max: Infinity, color: '#D06820' },
 ];
 
 function getZone(val: number) {
-  if (val < 0.4) return ZONES[0];
-  if (val < 1.5) return ZONES[1];
-  if (val < 3.0) return ZONES[2];
-  return ZONES[3];
+  return ZONES.find(z => val >= z.min && val < z.max) ?? ZONES[0];
 }
 
 export default function KetonesPage() {
@@ -27,12 +24,12 @@ export default function KetonesPage() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [history, setHistory] = useState<Biomarker[]>([]);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!profile) return;
     const { data } = await getSupabase()
-      .from('biomarkers').select('*').eq('user_id', profile.id).eq('marker', 'ketones')
+      .from('biomarkers').select('*').eq('user_id', profile.id).eq('marker', 'ketones_blood')
       .order('reading_date', { ascending: false }).limit(20);
     setHistory(data ?? []);
   }, [profile]);
@@ -40,16 +37,20 @@ export default function KetonesPage() {
   useEffect(() => { load(); }, [load]);
 
   const save = async () => {
-    if (!value || !profile) return;
+    if (!value || !profile || saving) return;
     setSaving(true);
-    await getSupabase().from('biomarkers').insert({
-      user_id: profile.id, marker: 'ketones', value: parseFloat(value), unit: 'mmol/L', reading_date: date,
+    const { error } = await getSupabase().from('biomarkers').insert({
+      user_id: profile.id, marker: 'ketones_blood', value: parseFloat(value), unit: 'mmol/L', reading_date: date,
     });
-    setValue('');
-    setSaved(true);
+    if (error) {
+      setFeedback({ ok: false, msg: error.message });
+    } else {
+      setValue('');
+      setFeedback({ ok: true, msg: 'Reading saved' });
+      setTimeout(() => setFeedback(null), 1500);
+      await load();
+    }
     setSaving(false);
-    await load();
-    setTimeout(() => setSaved(false), 2000);
   };
 
   const latest = history[0];
@@ -59,6 +60,18 @@ export default function KetonesPage() {
       <button onClick={() => router.back()} style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Lato, sans-serif' }}>← Back</button>
       <h1 className="h1 mb-4">Ketones</h1>
       <p className="body-sm mb-24">Blood ketone readings (mmol/L)</p>
+
+      {feedback && (
+        <div style={{
+          background: feedback.ok ? 'var(--primary-pale)' : '#FFF3F3',
+          border: `1px solid ${feedback.ok ? 'var(--border)' : '#FFCDD2'}`,
+          color: feedback.ok ? 'var(--primary)' : '#C62828',
+          borderRadius: 10, padding: '12px 16px', marginBottom: 16,
+          fontSize: 14, fontFamily: 'Lato, sans-serif',
+        }}>
+          {feedback.ok ? `✓ ${feedback.msg}` : feedback.msg}
+        </div>
+      )}
 
       {latest && (
         <div className="card-lg mb-20" style={{ backgroundColor: 'var(--primary-pale)', border: '1px solid var(--border)' }}>
@@ -72,15 +85,22 @@ export default function KetonesPage() {
         </div>
       )}
 
-      {/* Zone guide */}
       <div className="card-lg mb-20">
         <p className="section-label mb-10">Zone guide</p>
-        {ZONES.map(z => (
-          <div key={z.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-            <span style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: 'var(--text)' }}>{z.label}</span>
-            <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13, color: z.color }}>{z.range}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: 'var(--text)' }}>Not yet in ketosis</span>
+            <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13, color: '#7A9A6A' }}>Under 0.5</span>
           </div>
-        ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: 'var(--text)' }}>Nutritional ketosis (fat burning zone) ✓</span>
+            <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13, color: '#5C8A34' }}>0.5–3.0</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0' }}>
+            <span style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: 'var(--text)' }}>Deep ketosis</span>
+            <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13, color: '#D06820' }}>3.0+</span>
+          </div>
+        </div>
       </div>
 
       <div className="card-lg mb-24">
@@ -94,7 +114,7 @@ export default function KetonesPage() {
           <input className="input" type="date" value={date} onChange={e => setDate(e.target.value)} />
         </div>
         <button className="btn btn-primary" onClick={save} disabled={!value || saving}>
-          {saved ? '✓ Saved' : saving ? 'Saving…' : 'Save'}
+          {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
 
