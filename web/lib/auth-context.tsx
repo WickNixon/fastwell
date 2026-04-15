@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { useRouter } from 'next/navigation';
 import { Session, User } from '@supabase/supabase-js';
 import { getSupabase } from './supabase-browser';
+import { setCachedUserId } from './get-user-id';
 import type { Profile } from './types';
 
 interface AuthContextType {
@@ -59,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     supabase.auth.getSession()
       .then(async ({ data: { session } }) => {
+        setCachedUserId(session?.user?.id ?? null);
         setSession(session);
         if (session?.user) {
           await fetchProfile(session.user.id);
@@ -73,6 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setCachedUserId(session?.user?.id ?? null);
       setSession(session);
       if (session?.user) {
         await fetchProfile(session.user.id);

@@ -440,47 +440,21 @@ export default function DashboardPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const [debugMsg, setDebugMsg] = useState<string | null>(null);
-
   const startFast = async () => {
-    console.log('START FAST — Step 1: button clicked, starting=', starting);
-    setDebugMsg('Step 1: button clicked…');
-    if (starting) { console.log('START FAST — aborted: already starting'); return; }
+    if (starting) return;
     setStarting(true);
-
-    console.log('START FAST — Step 2: calling getAuthUserId()');
-    setDebugMsg('Step 2: getting session…');
     const userId = await getAuthUserId();
-    console.log('START FAST — Step 3: userId =', userId);
-    setDebugMsg(`Step 3: userId = ${userId ?? 'NULL'}`);
-
-    if (!userId) {
-      console.log('START FAST — aborted: userId is null');
-      setDebugMsg('FAILED: userId is null — session not found');
-      setStarting(false);
-      return;
-    }
-
-    console.log('START FAST — Step 4: inserting fasting_session, protocol=', selectedProtocol);
-    setDebugMsg(`Step 4: inserting to DB, protocol=${selectedProtocol}…`);
+    if (!userId) { setStarting(false); return; }
     try {
-      const { data, error } = await getSupabase()
+      const { data } = await getSupabase()
         .from('fasting_sessions')
         .insert({ user_id: userId, protocol: selectedProtocol, started_at: new Date().toISOString() })
         .select().single();
-      console.log('START FAST — Step 5: result error=', error, 'data=', data);
-      setDebugMsg(`Step 5: error=${error ? error.message : 'none'}, data=${data ? 'ok' : 'null'}`);
-      if (error) {
-        setDebugMsg(`DB ERROR: ${error.message} (code: ${error.code})`);
-      } else if (data) {
+      if (data) {
         setActiveFast(data as FastingSession);
         startTick(new Date(data.started_at));
-        setDebugMsg(null);
       }
-    } catch (e: unknown) {
-      console.log('START FAST — Step 5: threw exception', e);
-      setDebugMsg(`EXCEPTION: ${e instanceof Error ? e.message : String(e)}`);
-    }
+    } catch {}
     setStarting(false);
   };
 
@@ -531,20 +505,8 @@ export default function DashboardPage() {
     setInsights(prev => prev.filter(i => i.id !== id));
   };
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'UNDEFINED';
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'UNDEFINED';
-
   return (
     <div className="page page-top">
-      {/* ── DEBUG PANEL — remove after diagnosis ── */}
-      <div style={{ background: '#1a1a2e', color: '#00ff88', fontFamily: 'monospace', fontSize: 11, padding: '10px 14px', borderRadius: 8, marginBottom: 16, wordBreak: 'break-all' }}>
-        <p style={{ marginBottom: 4, fontWeight: 700 }}>🔍 ENV DEBUG</p>
-        <p>SUPABASE_URL: {supabaseUrl.slice(0, 30) || '(empty)'}</p>
-        <p>ANON_KEY: {supabaseKey.slice(0, 20) || '(empty)'}…</p>
-        {debugMsg && <p style={{ color: '#ffcc00', marginTop: 6 }}>FAST: {debugMsg}</p>}
-      </div>
-      {/* ── END DEBUG PANEL ── */}
-
       {/* Greeting */}
       <h1 className="h1 mb-2">{greeting}{profile?.first_name ? `, ${profile.first_name}` : ''}.</h1>
       <p className="body-sm mb-20" style={{ color: 'var(--text-muted)' }}>{dateLabel}</p>
