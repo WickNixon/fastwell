@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
+import type { HealthEntry } from '@/lib/types';
 
-const TODAY = new Date().toISOString().split('T')[0];
 const MOODS = [
   { value: 1, label: 'Struggling', icon: '😞' },
   { value: 2, label: 'Not great', icon: '😕' },
@@ -14,20 +14,29 @@ const MOODS = [
   { value: 5, label: 'Wonderful', icon: '😊' },
 ];
 
+function isoDate(d: Date) { return d.toISOString().split('T')[0]; }
+const TODAY = isoDate(new Date());
+
 export default function TrackMoodPage() {
   const { profile } = useAuth();
   const router = useRouter();
   const [selected, setSelected] = useState<number | null>(null);
+  const [trend, setTrend] = useState<HealthEntry[]>([]);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!profile) return;
-    getSupabase().from('health_entries').select('value')
-      .eq('user_id', profile.id).eq('entry_date', TODAY).eq('metric', 'mood').eq('source', 'manual')
-      .maybeSingle()
-      .then(({ data }) => { if (data) setSelected(data.value); });
+    const past = new Date(); past.setDate(past.getDate() - 6);
+    const { data } = await getSupabase().from('health_entries').select('*')
+      .eq('user_id', profile.id).eq('metric', 'mood')
+      .gte('entry_date', isoDate(past)).order('entry_date', { ascending: true });
+    setTrend(data ?? []);
+    const todayEntry = (data ?? []).find(e => e.entry_date === TODAY);
+    if (todayEntry) setSelected(todayEntry.value);
   }, [profile]);
+
+  useEffect(() => { load(); }, [load]);
 
   const save = async (val: number) => {
     if (!profile || saving) return;
@@ -42,6 +51,7 @@ export default function TrackMoodPage() {
       setFeedback({ ok: false, msg: error.message });
     } else {
       setFeedback({ ok: true, msg: 'Saved' });
+      await load();
       setTimeout(() => { setFeedback(null); router.back(); }, 1000);
     }
     setSaving(false);
@@ -65,7 +75,7 @@ export default function TrackMoodPage() {
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 32 }}>
         {MOODS.map(m => (
           <button
             key={m.value}
@@ -86,6 +96,27 @@ export default function TrackMoodPage() {
           </button>
         ))}
       </div>
+
+      {trend.length > 1 && (
+        <div className="section">
+          <p className="section-label mb-12">7-day trend</p>
+          <div className="card" style={{ padding: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 64 }}>
+              {trend.map(e => {
+                const pct = ((e.value ?? 0) / 5) * 100;
+                return (
+                  <div key={e.id} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                    <div style={{ width: '100%', height: `${pct}%`, minHeight: 4, backgroundColor: 'var(--primary)', borderRadius: 3 }} />
+                    <span style={{ fontSize: 9, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>
+                      {new Date(e.entry_date).toLocaleDateString('en-NZ', { day: 'numeric' })}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

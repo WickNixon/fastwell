@@ -6,38 +6,54 @@ import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
 
 const TODAY = new Date().toISOString().split('T')[0];
-const TYPES = ['Walk', 'Run', 'Yoga', 'Swim', 'Weights', 'Pilates', 'Cycling', 'Other'];
+const TYPES = ['Walk', 'Run', 'Gym', 'Swim', 'Yoga', 'Cycle', 'Other'];
 const DURATIONS = [15, 20, 30, 45, 60, 90];
+const INTENSITIES = [
+  { value: 'easy', label: 'Easy' },
+  { value: 'moderate', label: 'Moderate' },
+  { value: 'hard', label: 'Hard' },
+];
 
 export default function TrackExercisePage() {
   const { profile } = useAuth();
   const router = useRouter();
   const [type, setType] = useState('Walk');
   const [duration, setDuration] = useState<number | null>(null);
+  const [intensity, setIntensity] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
   useEffect(() => {
     if (!profile) return;
-    getSupabase().from('health_entries').select('value,value_text')
+    getSupabase().from('health_entries').select('value,value_text,notes')
       .eq('user_id', profile.id).eq('entry_date', TODAY).eq('metric', 'exercise_minutes').eq('source', 'manual')
       .maybeSingle()
-      .then(({ data }) => { if (data) { setDuration(data.value); if (data.value_text) setType(data.value_text); } });
+      .then(({ data }) => {
+        if (data) {
+          setDuration(data.value);
+          if (data.value_text) {
+            const parts = data.value_text.split('|');
+            setType(parts[0] ?? 'Walk');
+            if (parts[1]) setIntensity(parts[1]);
+          }
+        }
+      });
   }, [profile]);
 
   const save = async () => {
     if (!duration || !profile || saving) return;
     setSaving(true);
+    const valueText = intensity ? `${type}|${intensity}` : type;
     const { error } = await getSupabase().from('health_entries')
       .upsert({
         user_id: profile.id, entry_date: TODAY, metric: 'exercise_minutes',
-        value: duration, value_text: type, unit: 'minutes', source: 'manual',
+        value: duration, value_text: valueText, unit: 'minutes', source: 'manual',
       }, { onConflict: 'user_id,entry_date,metric,source' });
     if (error) {
       setFeedback({ ok: false, msg: error.message });
     } else {
       setFeedback({ ok: true, msg: 'Saved' });
-      setTimeout(() => setFeedback(null), 1500);
+      setTimeout(() => { setFeedback(null); router.back(); }, 1200);
     }
     setSaving(false);
   };
@@ -45,7 +61,8 @@ export default function TrackExercisePage() {
   return (
     <div className="page page-top">
       <button onClick={() => router.back()} style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Lato, sans-serif' }}>← Back</button>
-      <h1 className="h1 mb-24">Exercise</h1>
+      <h1 className="h1 mb-8">Exercise</h1>
+      <p className="body-sm mb-24">Log today's movement</p>
 
       {feedback && (
         <div style={{
@@ -96,6 +113,27 @@ export default function TrackExercisePage() {
               }}
             >
               {d}m
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="section">
+        <p className="section-label mb-12">Intensity</p>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {INTENSITIES.map(i => (
+            <button
+              key={i.value}
+              onClick={() => setIntensity(intensity === i.value ? null : i.value)}
+              style={{
+                flex: 1, padding: '12px 8px', borderRadius: 12,
+                border: `2px solid ${intensity === i.value ? 'var(--primary)' : 'var(--border)'}`,
+                backgroundColor: intensity === i.value ? 'var(--primary-pale)' : 'var(--surface)',
+                fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14,
+                color: intensity === i.value ? 'var(--primary)' : 'var(--text)', cursor: 'pointer',
+              }}
+            >
+              {i.label}
             </button>
           ))}
         </div>

@@ -27,56 +27,68 @@ export default function TrackSymptomsPage() {
   const { profile } = useAuth();
   const router = useRouter();
   const [logged, setLogged] = useState<SymptomLog[]>([]);
-  const [saving, setSaving] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!profile) return;
     const { data } = await getSupabase()
-      .from('symptoms_log')
-      .select('*')
-      .eq('user_id', profile.id)
-      .eq('entry_date', TODAY);
-    setLogged(data ?? []);
+      .from('symptoms_log').select('*')
+      .eq('user_id', profile.id).eq('entry_date', TODAY);
+    const existing = data ?? [];
+    setLogged(existing);
+    setSelected(new Set(existing.map((l: SymptomLog) => l.symptom)));
   }, [profile]);
 
   useEffect(() => { load(); }, [load]);
 
-  const toggle = async (symptom: string) => {
-    if (!profile) return;
-    setSaving(symptom);
-    const existing = logged.find(l => l.symptom === symptom);
-    if (existing) {
-      const { error } = await getSupabase().from('symptoms_log').delete().eq('id', existing.id);
-      if (error) {
-        setFeedback({ ok: false, msg: error.message });
-      } else {
-        setLogged(prev => prev.filter(l => l.symptom !== symptom));
-      }
-    } else {
-      const { data, error } = await getSupabase()
-        .from('symptoms_log')
-        .insert({ user_id: profile.id, entry_date: TODAY, symptom, severity: 3 })
-        .select()
-        .single();
-      if (error) {
-        setFeedback({ ok: false, msg: error.message });
-      } else if (data) {
-        setLogged(prev => [...prev, data as SymptomLog]);
-        setFeedback({ ok: true, msg: 'Logged' });
-        setTimeout(() => setFeedback(null), 1500);
-      }
-    }
-    setSaving(null);
+  const toggleSelected = (symptom: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(symptom)) next.delete(symptom);
+      else next.add(symptom);
+      return next;
+    });
   };
 
-  const loggedKeys = new Set(logged.map(l => l.symptom));
+  const save = async () => {
+    if (!profile || saving) return;
+    setSaving(true);
+
+    // Delete any existing for today so we can re-insert cleanly
+    if (logged.length > 0) {
+      await getSupabase().from('symptoms_log').delete().eq('user_id', profile.id).eq('entry_date', TODAY);
+    }
+
+    if (selected.size > 0) {
+      const rows = Array.from(selected).map(symptom => ({
+        user_id: profile.id,
+        entry_date: TODAY,
+        symptom,
+        severity: 3,
+        notes: notes || null,
+      }));
+      const { error } = await getSupabase().from('symptoms_log').insert(rows);
+      if (error) {
+        setFeedback({ ok: false, msg: error.message });
+        setSaving(false);
+        return;
+      }
+    }
+
+    setFeedback({ ok: true, msg: `${selected.size} symptom${selected.size === 1 ? '' : 's'} saved` });
+    await load();
+    setTimeout(() => { setFeedback(null); router.back(); }, 1200);
+    setSaving(false);
+  };
 
   return (
     <div className="page page-top">
       <button onClick={() => router.back()} style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Lato, sans-serif' }}>← Back</button>
       <h1 className="h1 mb-8">Symptoms</h1>
-      <p className="body-sm mb-24">Tap to log any symptoms you're experiencing today.</p>
+      <p className="body-sm mb-24">Select any symptoms you're experiencing today, then tap Save.</p>
 
       {feedback && (
         <div style={{
@@ -90,17 +102,16 @@ export default function TrackSymptomsPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 24 }}>
         {SYMPTOMS.map(s => {
-          const active = loggedKeys.has(s.key);
+          const active = selected.has(s.key);
           return (
             <button
               key={s.key}
-              onClick={() => toggle(s.key)}
-              disabled={saving === s.key}
+              onClick={() => toggleSelected(s.key)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 10,
-                padding: '14px 14px', borderRadius: 12, textAlign: 'left',
+                padding: '14px', borderRadius: 12, textAlign: 'left',
                 border: `2px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
                 backgroundColor: active ? '#FFF0E6' : 'var(--surface)',
                 cursor: 'pointer',
@@ -115,11 +126,27 @@ export default function TrackSymptomsPage() {
         })}
       </div>
 
-      {logged.length > 0 && (
-        <p className="body-sm text-center mt-20">
-          {logged.length} symptom{logged.length === 1 ? '' : 's'} logged today
-        </p>
+      {selected.size > 0 && (
+        <div className="input-group">
+          <label className="input-label">Notes (optional)</label>
+          <textarea
+            className="input"
+            placeholder="e.g. Noticed this after having coffee..."
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            rows={3}
+            style={{ resize: 'none' }}
+          />
+        </div>
       )}
+
+      <button
+        className="btn btn-primary"
+        onClick={save}
+        disabled={saving}
+      >
+        {saving ? 'Saving…' : selected.size > 0 ? `Save ${selected.size} symptom${selected.size === 1 ? '' : 's'}` : 'Save — no symptoms today'}
+      </button>
     </div>
   );
 }
