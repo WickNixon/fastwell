@@ -29,25 +29,44 @@ export default function TrackWaterPage() {
   }, [profile]);
 
   const save = async (ml: number) => {
-    const userId = await getAuthUserId();
-    if (!userId || saving) return;
+    console.log('WATER SAVE — Step 1: button clicked, ml=', ml, 'saving=', saving);
+    if (saving) { console.log('WATER SAVE — aborted: already saving'); return; }
     setSaving(true);
-    const { error } = await getSupabase()
-      .from('health_entries')
-      .upsert({
-        user_id: userId,
-        entry_date: TODAY,
-        metric: 'water_ml',
-        value: ml,
-        unit: 'ml',
-        source: 'manual',
-      }, { onConflict: 'user_id,entry_date,metric,source' });
-    if (error) {
-      setFeedback({ ok: false, msg: error.message });
-    } else {
-      setCurrent(ml);
-      setFeedback({ ok: true, msg: 'Saved' });
-      setTimeout(() => setFeedback(null), 1500);
+
+    console.log('WATER SAVE — Step 2: calling getAuthUserId()');
+    const userId = await getAuthUserId();
+    console.log('WATER SAVE — Step 3: userId =', userId);
+
+    if (!userId) {
+      console.log('WATER SAVE — aborted: userId is null');
+      setFeedback({ ok: false, msg: 'DEBUG: userId is null — session not found. Check console.' });
+      setSaving(false);
+      return;
+    }
+
+    console.log('WATER SAVE — Step 4: calling supabase upsert');
+    try {
+      const { error, data } = await getSupabase()
+        .from('health_entries')
+        .upsert({
+          user_id: userId,
+          entry_date: TODAY,
+          metric: 'water_ml',
+          value: ml,
+          unit: 'ml',
+          source: 'manual',
+        }, { onConflict: 'user_id,entry_date,metric,source' });
+      console.log('WATER SAVE — Step 5: result error=', error, 'data=', data);
+      if (error) {
+        setFeedback({ ok: false, msg: `DB ERROR: ${error.message} (code: ${error.code})` });
+      } else {
+        setCurrent(ml);
+        setFeedback({ ok: true, msg: 'Saved' });
+        setTimeout(() => setFeedback(null), 1500);
+      }
+    } catch (e: unknown) {
+      console.log('WATER SAVE — Step 5: threw exception', e);
+      setFeedback({ ok: false, msg: `EXCEPTION: ${e instanceof Error ? e.message : String(e)}` });
     }
     setSaving(false);
   };
