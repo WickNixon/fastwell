@@ -39,7 +39,9 @@ export default function OnboardingStagePage() {
     setSelected(key);
     setLoading(true);
     await getSupabase().from('profiles').update({ menopause_stage: key }).eq('id', user.id);
-    setTimeout(() => router.push('/onboarding/cycle'), 600);
+    // Post-menopausal users skip the cycle question — it's not relevant
+    const next = key === 'post_menopause' ? '/onboarding/hrt' : '/onboarding/cycle';
+    setTimeout(() => router.push(next), 600);
   };
 
   return (
