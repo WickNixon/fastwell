@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase-server';
 
 export default async function RootPage() {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
       const { data: profile } = await supabase
