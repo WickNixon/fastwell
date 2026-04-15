@@ -20,7 +20,10 @@ export default function FastingTimerPage() {
   const [elapsed, setElapsed] = useState(0); // seconds
   const [selectedProtocol, setSelectedProtocol] = useState('16:8');
   const [loading, setLoading] = useState(true);
+  const [starting, setStarting] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [complete, setComplete] = useState(false);
+  const [error, setError] = useState('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startTick = useCallback((startTime: Date) => {
@@ -32,6 +35,7 @@ export default function FastingTimerPage() {
 
   useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
 
+  // Resume on mount if session exists
   useEffect(() => {
     if (!profile) return;
     (async () => {
@@ -50,28 +54,42 @@ export default function FastingTimerPage() {
   }, [profile, startTick]);
 
   const startFast = async () => {
-    if (!profile) return;
-    const { data } = await getSupabase()
+    if (!profile || starting) return;
+    setStarting(true);
+    setError('');
+    const { data, error: err } = await getSupabase()
       .from('fasting_sessions')
       .insert({ user_id: profile.id, protocol: selectedProtocol, started_at: new Date().toISOString() })
       .select()
       .single();
+    if (err) {
+      setError(err.message);
+      setStarting(false);
+      return;
+    }
     if (data) {
       setActiveFast(data as FastingSession);
       startTick(new Date(data.started_at));
     }
+    setStarting(false);
   };
 
   const breakFast = async () => {
     if (!activeFast) return;
     setConfirm(false);
     if (intervalRef.current) clearInterval(intervalRef.current);
-    await getSupabase()
+    const { error: err } = await getSupabase()
       .from('fasting_sessions')
       .update({ ended_at: new Date().toISOString(), duration_minutes: Math.floor(elapsed / 60) })
       .eq('id', activeFast.id);
+    if (err) {
+      setError(err.message);
+      return;
+    }
     setActiveFast(null);
     setElapsed(0);
+    setComplete(true);
+    setTimeout(() => router.push('/dashboard'), 2000);
   };
 
   const formatTime = (s: number) => {
@@ -88,6 +106,21 @@ export default function FastingTimerPage() {
 
   if (loading) {
     return <div className="loading-screen" style={{ background: 'var(--primary)' }}><div className="spinner" style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /></div>;
+  }
+
+  // Completion screen
+  if (complete) {
+    return (
+      <div className="timer-screen" style={{ justifyContent: 'center', textAlign: 'center' }}>
+        <div style={{ fontSize: 64, marginBottom: 24 }}>🌿</div>
+        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 24, color: '#FFFFFF', marginBottom: 12 }}>
+          Fast complete.
+        </p>
+        <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 18, color: 'rgba(255,255,255,0.85)' }}>
+          Well done{profile?.first_name ? `, ${profile.first_name}` : ''}.
+        </p>
+      </div>
+    );
   }
 
   if (activeFast) {
@@ -118,6 +151,10 @@ export default function FastingTimerPage() {
         <div className="progress-track" style={{ width: '100%', maxWidth: 300, marginBottom: 40 }}>
           <div className="progress-fill" style={{ width: `${progress * 100}%` }} />
         </div>
+
+        {error && (
+          <p style={{ color: '#FFCDD2', fontFamily: 'Lato, sans-serif', fontSize: 14, marginBottom: 16 }}>{error}</p>
+        )}
 
         <button
           className="btn btn-white"
@@ -155,18 +192,22 @@ export default function FastingTimerPage() {
       <h1 className="h1 mb-8">Start a fast</h1>
       <p className="body-sm mb-32">Choose your fasting window.</p>
 
+      {error && (
+        <div style={{ background: '#FFF3F3', border: '1px solid #FFCDD2', color: '#C62828', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 14, fontFamily: 'Lato, sans-serif' }}>
+          {error}
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 32 }}>
         {PROTOCOLS.map(p => (
           <button
             key={p.key}
             onClick={() => setSelectedProtocol(p.key)}
             style={{
-              padding: 16,
-              borderRadius: 12,
+              padding: 16, borderRadius: 12,
               border: `2px solid ${selectedProtocol === p.key ? 'var(--primary)' : 'var(--border)'}`,
               backgroundColor: selectedProtocol === p.key ? 'var(--primary-pale)' : 'var(--surface)',
-              cursor: 'pointer',
-              textAlign: 'center',
+              cursor: 'pointer', textAlign: 'center',
             }}
           >
             <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 18, color: selectedProtocol === p.key ? 'var(--primary)' : 'var(--text)' }}>
@@ -177,8 +218,8 @@ export default function FastingTimerPage() {
         ))}
       </div>
 
-      <button className="btn btn-primary" onClick={startFast}>
-        Start fast
+      <button className="btn btn-primary" onClick={startFast} disabled={starting}>
+        {starting ? 'Starting…' : 'Start fast'}
       </button>
     </div>
   );
