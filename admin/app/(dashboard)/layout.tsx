@@ -18,9 +18,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </h2>
 
         {[
-          { href: '/dashboard', label: '📊 Overview' },
-          { href: '/dashboard/members', label: '👥 Members' },
-          { href: '/dashboard/invites', label: '✉️ Invites' },
+          { href: '/', label: '📊 Overview' },
+          { href: '/members', label: '👥 Members' },
+          { href: '/invites', label: '✉️ Invites' },
         ].map((item) => (
           <Link
             key={item.href}
