@@ -23,7 +23,7 @@ export default function SignupPage() {
     setError('');
     setLoading(true);
     const supabase = getSupabase();
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -35,7 +35,12 @@ export default function SignupPage() {
       setLoading(false);
       return;
     }
-    router.push('/onboarding/name');
+    if (data.user) {
+      router.push('/onboarding/name');
+    } else {
+      setError('Something went wrong. Please try again.');
+      setLoading(false);
+    }
   };
 
   return (
