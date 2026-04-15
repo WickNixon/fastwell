@@ -106,7 +106,7 @@ export default function ResultsPage() {
             <p className="section-label mb-12">Wellbeing</p>
             <div className="stat-row">
               <div className="stat-card">
-                <p className="stat-value">{avg('energy') ?? '—'}</p>
+                <p className="stat-value">{avg('energy_level') ?? '—'}</p>
                 <p className="stat-unit">avg energy</p>
               </div>
               <div className="stat-card">
@@ -122,9 +122,9 @@ export default function ResultsPage() {
 
           {entries.length === 0 && fasts.length === 0 && (
             <div className="empty-state mt-20">
-              <div className="empty-state-icon">📊</div>
-              <p className="h3">Nothing logged yet in this period</p>
-              <p className="body-sm">Start tracking and your results will appear here.</p>
+              <div className="empty-state-icon">🌱</div>
+              <p className="h3">Nothing here yet</p>
+              <p className="body-sm">As you start logging, your progress will show up here — ready to share with your GP or just to see how far you've come.</p>
             </div>
           )}
         </>

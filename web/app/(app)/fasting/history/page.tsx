@@ -85,8 +85,8 @@ export default function FastingHistoryPage() {
       ) : sessions.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">🌿</div>
-          <p className="h3">No fasts yet in this period</p>
-          <p className="body-sm">Your completed fasts will appear here.</p>
+          <p className="h3">No fasts in this period</p>
+          <p className="body-sm">Your completed fasts will show up here — each one a moment you showed up for yourself.</p>
         </div>
       ) : (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>

@@ -12,7 +12,7 @@ const LIFESTYLE = [
   { key: 'steps', label: 'Steps', icon: '👟', href: '/track/steps', metric: 'steps' },
   { key: 'exercise', label: 'Exercise', icon: '🏃‍♀️', href: '/track/exercise', metric: 'exercise_minutes' },
   { key: 'mood', label: 'Mood', icon: '🌿', href: '/track/mood', metric: 'mood' },
-  { key: 'energy', label: 'Energy', icon: '⚡', href: '/track/energy', metric: 'energy' },
+  { key: 'energy', label: 'Energy', icon: '⚡', href: '/track/energy', metric: 'energy_level' },
   { key: 'symptoms', label: 'Symptoms', icon: '📋', href: '/track/symptoms', metric: 'symptoms' },
 ];
 
