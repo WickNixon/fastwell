@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Session, User } from '@supabase/supabase-js';
 import { getSupabase } from './supabase-browser';
@@ -30,23 +30,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const supabase = getSupabase();
+  const loadingDone = useRef(false);
 
-  const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    if (data) setProfile(data as Profile);
-    return data as Profile | null;
+  const markLoaded = () => {
+    if (!loadingDone.current) {
+      loadingDone.current = true;
+      setLoading(false);
+    }
+  };
+
+  const fetchProfile = async (userId: string): Promise<Profile | null> => {
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      if (data) setProfile(data as Profile);
+      return data as Profile | null;
+    } catch {
+      return null;
+    }
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) await fetchProfile(session.user.id);
-      setLoading(false);
-    });
+    // Safety net: if auth init takes more than 5 seconds, unblock the UI anyway
+    const timeout = setTimeout(() => markLoaded(), 5000);
+
+    supabase.auth.getSession()
+      .then(async ({ data: { session } }) => {
+        setSession(session);
+        if (session?.user) {
+          await fetchProfile(session.user.id);
+        }
+      })
+      .catch(() => {
+        // getSession failed — treat as unauthenticated
+      })
+      .finally(() => {
+        clearTimeout(timeout);
+        markLoaded();
+      });
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
@@ -55,9 +79,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setProfile(null);
       }
+      // If INITIAL_SESSION fires before getSession resolves, also unblock
+      if (event === 'INITIAL_SESSION') markLoaded();
     });
 
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeout);
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   // Apply theme preference to html element

@@ -402,31 +402,39 @@ export default function DashboardPage() {
     if (!profile) return;
     const sb = getSupabase();
 
-    // Active fast
-    const { data: fast } = await sb
-      .from('fasting_sessions').select('*').eq('user_id', profile.id)
-      .is('ended_at', null).order('started_at', { ascending: false }).limit(1).maybeSingle();
-    setActiveFast(fast ?? null);
-    if (fast) startTick(new Date(fast.started_at));
+    try {
+      // Active fast
+      const { data: fast } = await sb
+        .from('fasting_sessions').select('*').eq('user_id', profile.id)
+        .is('ended_at', null).order('started_at', { ascending: false }).limit(1).maybeSingle();
+      setActiveFast(fast ?? null);
+      if (fast) startTick(new Date(fast.started_at));
+    } catch {}
 
-    // Today's health entries
-    const { data: entries } = await sb
-      .from('health_entries').select('metric').eq('user_id', profile.id).eq('entry_date', today);
-    setTodayEntries(new Set((entries ?? []).map((e: { metric: string }) => e.metric)));
+    try {
+      // Today's health entries
+      const { data: entries } = await sb
+        .from('health_entries').select('metric').eq('user_id', profile.id).eq('entry_date', today);
+      setTodayEntries(new Set((entries ?? []).map((e: { metric: string }) => e.metric)));
+    } catch {}
 
-    // Completion dates (last 28 days for calendar)
-    const past = new Date(); past.setDate(past.getDate() - 28);
-    const { data: pastEntries } = await sb
-      .from('health_entries').select('entry_date').eq('user_id', profile.id)
-      .gte('entry_date', isoDate(past));
-    setCompletedDates(new Set((pastEntries ?? []).map((e: { entry_date: string }) => e.entry_date)));
+    try {
+      // Completion dates (last 28 days for calendar)
+      const past = new Date(); past.setDate(past.getDate() - 28);
+      const { data: pastEntries } = await sb
+        .from('health_entries').select('entry_date').eq('user_id', profile.id)
+        .gte('entry_date', isoDate(past));
+      setCompletedDates(new Set((pastEntries ?? []).map((e: { entry_date: string }) => e.entry_date)));
+    } catch {}
 
-    // AI insights
-    const { data: ins } = await sb
-      .from('ai_insights').select('id,insight_text').eq('user_id', profile.id)
-      .gt('expires_at', new Date().toISOString()).is('dismissed_at', null)
-      .order('generated_at', { ascending: false }).limit(2);
-    setInsights(ins ?? []);
+    try {
+      // AI insights
+      const { data: ins } = await sb
+        .from('ai_insights').select('id,insight_text').eq('user_id', profile.id)
+        .gt('expires_at', new Date().toISOString()).is('dismissed_at', null)
+        .order('generated_at', { ascending: false }).limit(2);
+      setInsights(ins ?? []);
+    } catch {}
   }, [profile, today, startTick]);
 
   useEffect(() => { load(); }, [load]);
