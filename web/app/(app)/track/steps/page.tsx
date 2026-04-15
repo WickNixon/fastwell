@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
+import { getAuthUserId } from '@/lib/get-user-id';
 import type { HealthEntry } from '@/lib/types';
 
 function isoDate(d: Date) { return d.toISOString().split('T')[0]; }
@@ -32,12 +33,13 @@ export default function TrackStepsPage() {
   useEffect(() => { load(); }, [load]);
 
   const save = async () => {
-    if (!value || !profile || saving) return;
+    const userId = await getAuthUserId();
+    if (!value || !userId || saving) return;
     setSaving(true);
     const steps = parseInt(value);
     const { error } = await getSupabase().from('health_entries')
       .upsert({
-        user_id: profile.id, entry_date: TODAY, metric: 'steps',
+        user_id: userId, entry_date: TODAY, metric: 'steps',
         value: steps, unit: 'steps', source: 'manual',
       }, { onConflict: 'user_id,entry_date,metric,source' });
     if (error) {

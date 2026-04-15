@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
+import { getAuthUserId } from '@/lib/get-user-id';
 import type { Biomarker } from '@/lib/types';
 
 export default function GlucosePage() {
@@ -28,10 +29,11 @@ export default function GlucosePage() {
   useEffect(() => { load(); }, [load]);
 
   const save = async () => {
-    if (!value || !profile || saving) return;
+    const userId = await getAuthUserId();
+    if (!value || !userId || saving) return;
     setSaving(true);
     const { error } = await getSupabase().from('biomarkers').insert({
-      user_id: profile.id,
+      user_id: userId,
       marker: 'blood_glucose',
       value: parseFloat(value),
       unit: unit === 'mmol' ? 'mmol/L' : 'mg/dL',

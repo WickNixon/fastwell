@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { UserBadge } from '@/lib/types';
@@ -20,26 +20,41 @@ const BADGE_DETAILS: Record<string, { icon: string; message: string }> = {
 };
 
 export default function RewardsPage() {
-  const { profile } = useAuth();
+  const { profile, loading: authLoading } = useAuth();
   const [badges, setBadges] = useState<UserBadge[]>([]);
   const [selected, setSelected] = useState<UserBadge | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
     if (!profile) return;
-    const { data } = await getSupabase()
-      .from('user_badges').select('*').eq('user_id', profile.id)
-      .order('earned_at', { ascending: false });
-    setBadges(data ?? []);
-    // Mark unseen as seen
-    const unseen = (data ?? []).filter(b => !b.seen).map(b => b.id);
-    if (unseen.length) {
-      await getSupabase().from('user_badges').update({ seen: true }).in('id', unseen);
+    setLoading(true);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => setLoading(false), 5000);
+
+    try {
+      const { data } = await getSupabase()
+        .from('user_badges').select('*').eq('user_id', profile.id)
+        .order('earned_at', { ascending: false });
+      setBadges(data ?? []);
+      const unseen = (data ?? []).filter(b => !b.seen).map(b => b.id);
+      if (unseen.length) {
+        await getSupabase().from('user_badges').update({ seen: true }).in('id', unseen);
+      }
+    } catch {
+      // Failed to load badges — show empty state
+    } finally {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      setLoading(false);
     }
-    setLoading(false);
   }, [profile]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (authLoading) return;
+    load();
+  }, [authLoading, load]);
+
+  useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
 
   return (
     <div className="page page-top">

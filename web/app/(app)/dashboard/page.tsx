@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
+import { getAuthUserId } from '@/lib/get-user-id';
 import type { FastingSession } from '@/lib/types';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -440,11 +441,12 @@ export default function DashboardPage() {
   useEffect(() => { load(); }, [load]);
 
   const startFast = async () => {
-    if (!profile || starting) return;
+    const userId = await getAuthUserId();
+    if (!userId || starting) return;
     setStarting(true);
     const { data } = await getSupabase()
       .from('fasting_sessions')
-      .insert({ user_id: profile.id, protocol: selectedProtocol, started_at: new Date().toISOString() })
+      .insert({ user_id: userId, protocol: selectedProtocol, started_at: new Date().toISOString() })
       .select().single();
     if (data) {
       setActiveFast(data as FastingSession);
@@ -471,11 +473,13 @@ export default function DashboardPage() {
   };
 
   const handleBottomSheetDone = async (emoji: number | null, memo: string) => {
-    if (!bottomSheet || !profile) return;
+    if (!bottomSheet) return;
+    const userId = await getAuthUserId();
+    if (!userId) return;
     setBottomSheet(null);
     // Save a health entry to mark it done today
     await getSupabase().from('health_entries').upsert({
-      user_id: profile.id,
+      user_id: userId,
       entry_date: today,
       metric: bottomSheet.key,
       value: emoji ?? 1,

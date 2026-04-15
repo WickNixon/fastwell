@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
+import { getAuthUserId } from '@/lib/get-user-id';
 import type { Supplement } from '@/lib/types';
 
 // DB values that match the CHECK constraint in the supplements table
@@ -45,10 +46,11 @@ export default function SupplementsPage() {
   useEffect(() => { load(); }, [load]);
 
   const save = async () => {
-    if (!name || !profile || saving) return;
+    const userId = await getAuthUserId();
+    if (!name || !userId || saving) return;
     setSaving(true);
     const { error } = await getSupabase().from('supplements').insert({
-      user_id: profile.id, name, type, dose: dose || null, frequency, delivery, is_active: true,
+      user_id: userId, name, type, dose: dose || null, frequency, delivery, is_active: true,
     });
     if (error) {
       setFeedback({ ok: false, msg: error.message });

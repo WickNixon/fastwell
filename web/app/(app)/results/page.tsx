@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { HealthEntry, Biomarker, FastingSession } from '@/lib/types';
@@ -8,34 +8,51 @@ import type { HealthEntry, Biomarker, FastingSession } from '@/lib/types';
 type Period = '7d' | '30d' | '3m' | '6m' | '12m';
 
 export default function ResultsPage() {
-  const { profile } = useAuth();
+  const { profile, loading: authLoading } = useAuth();
   const [period, setPeriod] = useState<Period>('30d');
   const [entries, setEntries] = useState<HealthEntry[]>([]);
   const [biomarkers, setBiomarkers] = useState<Biomarker[]>([]);
   const [fasts, setFasts] = useState<FastingSession[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const DAYS: Record<Period, number> = { '7d': 7, '30d': 30, '3m': 90, '6m': 180, '12m': 365 };
 
   const load = useCallback(async () => {
     if (!profile) return;
     setLoading(true);
-    const since = new Date(Date.now() - DAYS[period] * 86400000).toISOString();
-    const sb = getSupabase();
+    // Safety timeout: never spin forever
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => setLoading(false), 5000);
 
-    const [{ data: e }, { data: b }, { data: f }] = await Promise.all([
-      sb.from('health_entries').select('*').eq('user_id', profile.id).gte('entry_date', since.split('T')[0]),
-      sb.from('biomarkers').select('*').eq('user_id', profile.id).gte('reading_date', since.split('T')[0]).order('reading_date', { ascending: false }),
-      sb.from('fasting_sessions').select('*').eq('user_id', profile.id).gte('started_at', since).not('ended_at', 'is', null),
-    ]);
+    try {
+      const since = new Date(Date.now() - DAYS[period] * 86400000).toISOString();
+      const sb = getSupabase();
 
-    setEntries(e ?? []);
-    setBiomarkers(b ?? []);
-    setFasts(f ?? []);
-    setLoading(false);
+      const [{ data: e }, { data: b }, { data: f }] = await Promise.all([
+        sb.from('health_entries').select('*').eq('user_id', profile.id).gte('entry_date', since.split('T')[0]),
+        sb.from('biomarkers').select('*').eq('user_id', profile.id).gte('reading_date', since.split('T')[0]).order('reading_date', { ascending: false }),
+        sb.from('fasting_sessions').select('*').eq('user_id', profile.id).gte('started_at', since).not('ended_at', 'is', null),
+      ]);
+
+      setEntries(e ?? []);
+      setBiomarkers(b ?? []);
+      setFasts(f ?? []);
+    } catch {
+      // Queries failed — show empty state
+    } finally {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      setLoading(false);
+    }
   }, [profile, period]);
 
-  useEffect(() => { load(); }, [load]);
+  // Only fire after auth has resolved — prevents hanging on null profile
+  useEffect(() => {
+    if (authLoading) return;
+    load();
+  }, [authLoading, load]);
+
+  useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
 
   const avg = (metric: string) => {
     const vals = entries.filter(e => e.metric === metric).map(e => e.value).filter(v => v != null) as number[];

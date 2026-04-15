@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
+import { getAuthUserId } from '@/lib/get-user-id';
 
 const TODAY = new Date().toISOString().split('T')[0];
 const TYPES = ['Walk', 'Run', 'Gym', 'Swim', 'Yoga', 'Cycle', 'Other'];
@@ -41,12 +42,13 @@ export default function TrackExercisePage() {
   }, [profile]);
 
   const save = async () => {
-    if (!duration || !profile || saving) return;
+    const userId = await getAuthUserId();
+    if (!duration || !userId || saving) return;
     setSaving(true);
     const valueText = intensity ? `${type}|${intensity}` : type;
     const { error } = await getSupabase().from('health_entries')
       .upsert({
-        user_id: profile.id, entry_date: TODAY, metric: 'exercise_minutes',
+        user_id: userId, entry_date: TODAY, metric: 'exercise_minutes',
         value: duration, value_text: valueText, unit: 'minutes', source: 'manual',
       }, { onConflict: 'user_id,entry_date,metric,source' });
     if (error) {

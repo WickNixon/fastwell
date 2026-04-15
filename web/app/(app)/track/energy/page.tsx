@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
+import { getAuthUserId } from '@/lib/get-user-id';
 import type { HealthEntry } from '@/lib/types';
 
 const LEVELS = [
@@ -40,12 +41,13 @@ export default function TrackEnergyPage() {
   useEffect(() => { load(); }, [load]);
 
   const save = async (val: number) => {
-    if (!profile || saving) return;
+    const userId = await getAuthUserId();
+    if (!userId || saving) return;
     setSaving(true);
     setSelected(val);
     const { error } = await getSupabase().from('health_entries')
       .upsert({
-        user_id: profile.id, entry_date: TODAY, metric: 'energy_level',
+        user_id: userId, entry_date: TODAY, metric: 'energy_level',
         value: val, unit: 'scale_1_5', source: 'manual',
       }, { onConflict: 'user_id,entry_date,metric,source' });
     if (error) {

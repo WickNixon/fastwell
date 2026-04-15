@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
+import { getAuthUserId } from '@/lib/get-user-id';
 import type { SymptomLog } from '@/lib/types';
 
 const TODAY = new Date().toISOString().split('T')[0];
@@ -54,17 +55,18 @@ export default function TrackSymptomsPage() {
   };
 
   const save = async () => {
-    if (!profile || saving) return;
+    const userId = await getAuthUserId();
+    if (!userId || saving) return;
     setSaving(true);
 
     // Delete any existing for today so we can re-insert cleanly
     if (logged.length > 0) {
-      await getSupabase().from('symptoms_log').delete().eq('user_id', profile.id).eq('entry_date', TODAY);
+      await getSupabase().from('symptoms_log').delete().eq('user_id', userId).eq('entry_date', TODAY);
     }
 
     if (selected.size > 0) {
       const rows = Array.from(selected).map(symptom => ({
-        user_id: profile.id,
+        user_id: userId,
         entry_date: TODAY,
         symptom,
         severity: 3,
