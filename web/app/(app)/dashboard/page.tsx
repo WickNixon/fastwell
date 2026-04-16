@@ -248,11 +248,12 @@ function FastingCard({
 // ─── Habit Card ───────────────────────────────────────────────────────────────
 
 function HabitCard({
-  habit, done, customGoal, onTick, onCardTap, onEdit,
+  habit, done, customGoal, memoEmoji, onTick, onCardTap, onEdit,
 }: {
   habit: HabitDef;
   done: boolean;
   customGoal: string | undefined;
+  memoEmoji?: { emoji: string | null; memo: string | null };
   onTick: () => void;
   onCardTap: () => void;
   onEdit: () => void;
@@ -283,11 +284,11 @@ function HabitCard({
       <span style={{ fontSize: 26, flexShrink: 0, position: 'relative', zIndex: 1 }}>{habit.icon}</span>
       <div style={{ flex: 1, minWidth: 0, position: 'relative', zIndex: 1 }}>
         <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14, color: done ? 'var(--primary)' : 'var(--text)', marginBottom: 2 }}>
-          {habit.label}
+          {habit.label}{memoEmoji?.emoji ? <span style={{ marginLeft: 6, fontSize: 14 }}>{memoEmoji.emoji}</span> : null}
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>
-            {customGoal ?? habit.goal ?? ''}
+            {memoEmoji?.memo ? memoEmoji.memo : (customGoal ?? habit.goal ?? '')}
           </p>
           <button
             onClick={e => { e.stopPropagation(); onEdit(); }}
@@ -538,6 +539,7 @@ export default function DashboardPage() {
   const [customHabits, setCustomHabits] = useState<HabitDef[]>([]);
   const [customGoals, setCustomGoals] = useState<Record<string, string>>({});
   const [todayEntries, setTodayEntries] = useState<Set<string>>(new Set());
+  const [todayMemos, setTodayMemos] = useState<Record<string, { emoji: string | null; memo: string | null }>>({});
   const [bottomSheet, setBottomSheet] = useState<HabitDef | null>(null);
   const [addModal, setAddModal] = useState(false);
   const [goalEditHabit, setGoalEditHabit] = useState<HabitDef | null>(null);
@@ -659,10 +661,15 @@ export default function DashboardPage() {
     }
 
     try {
-      // Today's health entries
+      // Today's health entries — include memo/emoji for habit cards
       const { data: entries } = await sb
-        .from('health_entries').select('metric').eq('user_id', profile.id).eq('entry_date', today);
+        .from('health_entries').select('metric, memo, emoji').eq('user_id', profile.id).eq('entry_date', today);
       setTodayEntries(new Set((entries ?? []).map((e: { metric: string }) => e.metric)));
+      const memos: Record<string, { emoji: string | null; memo: string | null }> = {};
+      for (const e of (entries ?? [])) {
+        if (e.emoji || e.memo) memos[e.metric] = { emoji: e.emoji ?? null, memo: e.memo ?? null };
+      }
+      setTodayMemos(memos);
     } catch {}
 
     try {
@@ -763,17 +770,20 @@ export default function DashboardPage() {
     setBottomSheet(habit);
   };
 
-  const handleBottomSheetDone = async (emoji: number | null, memo: string) => {
+  const handleBottomSheetDone = async (emojiIndex: number | null, memo: string) => {
     if (!bottomSheet || !user) return;
+    const habitKey = bottomSheet.key;
     setBottomSheet(null);
-    // Update entry with emoji/note if provided
-    if (emoji !== null || memo) {
-      await supabase.from('health_entries')
-        .update({ value: emoji ?? 1, value_text: memo || null })
-        .eq('user_id', user.id)
-        .eq('entry_date', today)
-        .eq('metric', bottomSheet.key)
-        .eq('source', 'manual');
+    const emojiChar = emojiIndex !== null ? MEMO_EMOJIS[emojiIndex - 1] : null;
+    // Always update — even if no emoji/memo, clears old values
+    const { error } = await supabase.from('health_entries')
+      .update({ emoji: emojiChar, memo: memo || null })
+      .eq('user_id', user.id)
+      .eq('entry_date', today)
+      .eq('metric', habitKey)
+      .eq('source', 'manual');
+    if (!error && (emojiChar || memo)) {
+      setTodayMemos(prev => ({ ...prev, [habitKey]: { emoji: emojiChar, memo: memo || null } }));
     }
   };
 
@@ -858,6 +868,7 @@ export default function DashboardPage() {
             habit={habit}
             done={todayEntries.has(habit.key)}
             customGoal={customGoals[habit.key]}
+            memoEmoji={todayMemos[habit.key]}
             onTick={() => handleTick(habit)}
             onCardTap={() => router.push(habit.href)}
             onEdit={() => setGoalEditHabit(habit)}
