@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { FastingSession } from '@/lib/types';
 
@@ -141,6 +142,261 @@ function DaySummary({ dateStr, entries }: { dateStr: string; entries: DayEntry[]
               </p>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Food Log Section ─────────────────────────────────────────────────────────
+// Requires food_logs table in Supabase:
+// CREATE TABLE food_logs (
+//   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+//   user_id UUID REFERENCES profiles(id) NOT NULL,
+//   logged_at TIMESTAMPTZ DEFAULT NOW(),
+//   meal_name TEXT, image_url TEXT,
+//   calories NUMERIC, protein_g NUMERIC, carbs_g NUMERIC,
+//   fat_g NUMERIC, fibre_g NUMERIC, confidence TEXT, notes TEXT,
+//   created_at TIMESTAMPTZ DEFAULT NOW()
+// );
+// ALTER TABLE food_logs ENABLE ROW LEVEL SECURITY;
+// CREATE POLICY food_logs_own ON food_logs USING (auth.uid() = user_id);
+
+interface FoodLog {
+  id: string; meal_name: string | null; image_url: string | null;
+  calories: number | null; protein_g: number | null; carbs_g: number | null;
+  fat_g: number | null; fibre_g: number | null; confidence: string | null;
+  notes: string | null; logged_at: string;
+}
+interface MacroResult {
+  meal_name?: string; calories?: number; protein_g?: number; carbs_g?: number;
+  fat_g?: number; fibre_g?: number; confidence?: string; notes?: string; error?: string;
+}
+
+function FoodLogSection({ userId }: { userId: string }) {
+  const supabase = createClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [showSheet, setShowSheet] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState('image/jpeg');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [result, setResult] = useState<MacroResult | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [todayLogs, setTodayLogs] = useState<FoodLog[]>([]);
+  const today = new Date().toISOString().split('T')[0];
+
+  const loadTodayLogs = useCallback(async () => {
+    try {
+      const { data } = await supabase.from('food_logs').select('*')
+        .eq('user_id', userId)
+        .gte('logged_at', `${today}T00:00:00Z`)
+        .lte('logged_at', `${today}T23:59:59Z`)
+        .order('logged_at', { ascending: false });
+      setTodayLogs(data ?? []);
+    } catch {}
+  }, [userId, today]);
+
+  useEffect(() => { loadTodayLogs(); }, [loadTodayLogs]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setShowSheet(false);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const [header, data] = dataUrl.split(',');
+      const mt = header.match(/:(.*?);/)?.[1] ?? 'image/jpeg';
+      setMediaType(mt);
+      setImageBase64(data);
+      setImagePreview(dataUrl);
+      setResult(null);
+      setAnalyzing(true);
+    };
+    reader.readAsDataURL(file);
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+  };
+
+  useEffect(() => {
+    if (!imageBase64 || !analyzing) return;
+    (async () => {
+      try {
+        const res = await fetch('/api/analyze-meal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64, mediaType }),
+        });
+        const data = await res.json();
+        setResult(data);
+      } catch {
+        setResult({ error: 'Analysis failed — try a clearer photo' });
+      }
+      setAnalyzing(false);
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageBase64]);
+
+  const saveMeal = async () => {
+    if (!result || result.error) return;
+    setSaving(true);
+    let imageUrl: string | null = null;
+    if (imageBase64) {
+      try {
+        const filename = `${userId}/${Date.now()}.jpg`;
+        const bytes = Uint8Array.from(atob(imageBase64), c => c.charCodeAt(0));
+        const { data: up } = await supabase.storage.from('food-images').upload(filename, bytes, { contentType: mediaType });
+        if (up) imageUrl = supabase.storage.from('food-images').getPublicUrl(filename).data.publicUrl;
+      } catch {}
+    }
+    try {
+      await supabase.from('food_logs').insert({
+        user_id: userId, meal_name: result.meal_name, image_url: imageUrl,
+        calories: result.calories, protein_g: result.protein_g, carbs_g: result.carbs_g,
+        fat_g: result.fat_g, fibre_g: result.fibre_g, confidence: result.confidence, notes: result.notes,
+      });
+      setResult(null); setImageBase64(null); setImagePreview(null);
+      await loadTodayLogs();
+    } catch {}
+    setSaving(false);
+  };
+
+  const reset = () => { setResult(null); setImageBase64(null); setImagePreview(null); setAnalyzing(false); };
+
+  const totalCalories = todayLogs.reduce((s, l) => s + (l.calories ?? 0), 0);
+  const totalProtein = todayLogs.reduce((s, l) => s + (l.protein_g ?? 0), 0);
+  const totalCarbs = todayLogs.reduce((s, l) => s + (l.carbs_g ?? 0), 0);
+  const totalFat = todayLogs.reduce((s, l) => s + (l.fat_g ?? 0), 0);
+
+  return (
+    <div className="section">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <p className="section-label">Food today</p>
+        <button
+          onClick={() => setShowSheet(true)}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13 }}
+        >
+          + Log a meal
+        </button>
+      </div>
+
+      {/* Daily totals */}
+      {todayLogs.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 14 }}>
+          {[
+            { label: 'cal', value: Math.round(totalCalories) },
+            { label: 'protein', value: `${Math.round(totalProtein)}g` },
+            { label: 'carbs', value: `${Math.round(totalCarbs)}g` },
+            { label: 'fat', value: `${Math.round(totalFat)}g` },
+          ].map(({ label, value }) => (
+            <div key={label} style={{ backgroundColor: 'var(--primary-pale)', borderRadius: 10, padding: '10px 6px', textAlign: 'center' }}>
+              <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 15, color: 'var(--primary)' }}>{value}</p>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>{label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Today's meals */}
+      {todayLogs.map(log => (
+        <div key={log.id} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+          {log.image_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={log.image_url} alt={log.meal_name ?? ''} style={{ width: 52, height: 52, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+          )}
+          <div style={{ flex: 1 }}>
+            <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14, color: 'var(--text)', marginBottom: 2 }}>
+              {log.meal_name ?? 'Meal'}
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>
+              {[log.calories ? `${Math.round(log.calories)} cal` : null, log.protein_g ? `${Math.round(log.protein_g)}g protein` : null].filter(Boolean).join(' · ')}
+            </p>
+            {log.confidence === 'low' && (
+              <p style={{ fontSize: 11, color: 'var(--accent)', fontFamily: 'Lato, sans-serif', marginTop: 2 }}>
+                Estimate — portions are hard to judge from photos
+              </p>
+            )}
+          </div>
+        </div>
+      ))}
+
+      {todayLogs.length === 0 && !imagePreview && (
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', padding: '8px 0' }}>
+          No meals logged today.
+        </p>
+      )}
+
+      {/* Analysis card */}
+      {imagePreview && (
+        <div style={{ marginTop: 16, backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={imagePreview} alt="Meal preview" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 8, marginBottom: 12 }} />
+          {analyzing && (
+            <p style={{ textAlign: 'center', fontFamily: 'Lato, sans-serif', fontSize: 14, color: 'var(--text-muted)', padding: '8px 0' }}>
+              Analysing your meal…
+            </p>
+          )}
+          {result && !result.error && (
+            <>
+              <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 16, marginBottom: 10, color: 'var(--text)' }}>
+                {result.meal_name ?? 'Meal'}
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
+                {[
+                  { label: 'Calories', value: result.calories ? `${result.calories}` : '—' },
+                  { label: 'Protein', value: result.protein_g ? `${result.protein_g}g` : '—' },
+                  { label: 'Carbs', value: result.carbs_g ? `${result.carbs_g}g` : '—' },
+                  { label: 'Fat', value: result.fat_g ? `${result.fat_g}g` : '—' },
+                  { label: 'Fibre', value: result.fibre_g ? `${result.fibre_g}g` : '—' },
+                ].map(({ label, value }) => (
+                  <div key={label} style={{ textAlign: 'center', padding: '8px 4px', backgroundColor: 'var(--primary-pale)', borderRadius: 8 }}>
+                    <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 14, color: 'var(--primary)' }}>{value}</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>{label}</p>
+                  </div>
+                ))}
+              </div>
+              {result.confidence === 'low' && (
+                <p style={{ fontSize: 12, color: 'var(--accent)', fontFamily: 'Lato, sans-serif', marginBottom: 12 }}>
+                  This is an estimate — portions are hard to judge from photos.
+                </p>
+              )}
+              <button className="btn btn-primary" onClick={saveMeal} disabled={saving} style={{ marginBottom: 8 }}>
+                {saving ? 'Saving…' : 'Save this meal'}
+              </button>
+              <button className="btn btn-ghost" onClick={reset}>Try again</button>
+            </>
+          )}
+          {result?.error && (
+            <>
+              <p style={{ textAlign: 'center', fontSize: 14, color: '#C62828', fontFamily: 'Lato, sans-serif', marginBottom: 12 }}>
+                {result.error}
+              </p>
+              <button className="btn btn-ghost" onClick={reset}>Try again</button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Photo sheet */}
+      {showSheet && (
+        <div className="modal-overlay" onClick={() => setShowSheet(false)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <p style={{ textAlign: 'center', fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 16, marginBottom: 20 }}>
+              Log a meal
+            </p>
+            <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileChange} style={{ display: 'none' }} />
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
+            <button className="btn btn-primary" onClick={() => cameraInputRef.current?.click()} style={{ marginBottom: 10 }}>
+              📷 Take a photo
+            </button>
+            <button className="btn btn-outline" onClick={() => fileInputRef.current?.click()} style={{ marginBottom: 10 }}>
+              🖼 Choose from library
+            </button>
+            <button className="btn btn-ghost" onClick={() => setShowSheet(false)}>Cancel</button>
+          </div>
         </div>
       )}
     </div>
@@ -349,6 +605,9 @@ export default function MePage() {
         />
         {selectedDay && <DaySummary dateStr={selectedDay} entries={dayData[selectedDay] ?? []} />}
       </div>
+
+      {/* Food log */}
+      {profile?.id && <FoodLogSection userId={profile.id} />}
 
       {/* Period filter + results */}
       <div className="filter-tabs mb-20">
