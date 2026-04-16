@@ -5,12 +5,16 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
-const TODAY = new Date().toISOString().split('T')[0];
+
+function getTodayNZ() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
+}
 
 export default function TrackWaterPage() {
   const { profile, user } = useAuth();
   const supabase = createClient();
   const router = useRouter();
+  const TODAY = getTodayNZ();
   const [current, setCurrent] = useState(0);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);

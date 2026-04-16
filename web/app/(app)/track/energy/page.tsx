@@ -15,14 +15,15 @@ const LEVELS = [
   { value: 5, label: 'Energised', icon: '⚡' },
 ];
 
-function isoDate(d: Date) { return d.toISOString().split('T')[0]; }
-
-const TODAY = isoDate(new Date());
+function isoDate(d: Date) {
+  return d.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
+}
 
 export default function TrackEnergyPage() {
   const { profile, user } = useAuth();
   const supabase = createClient();
   const router = useRouter();
+  const TODAY = isoDate(new Date());
   const [selected, setSelected] = useState<number | null>(null);
   const [trend, setTrend] = useState<HealthEntry[]>([]);
   const [saving, setSaving] = useState(false);

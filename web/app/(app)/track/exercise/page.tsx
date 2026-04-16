@@ -6,7 +6,6 @@ import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 
-const TODAY = new Date().toISOString().split('T')[0];
 const TYPES = ['Walk', 'Run', 'Gym', 'Swim', 'Yoga', 'Cycle', 'Other'];
 const DURATIONS = [15, 20, 30, 45, 60, 90];
 const INTENSITIES = [
@@ -15,10 +14,15 @@ const INTENSITIES = [
   { value: 'hard', label: 'Hard' },
 ];
 
+function getTodayNZ() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
+}
+
 export default function TrackExercisePage() {
   const { profile, user } = useAuth();
   const supabase = createClient();
   const router = useRouter();
+  const TODAY = getTodayNZ();
   const [type, setType] = useState('Walk');
   const [duration, setDuration] = useState<number | null>(null);
   const [intensity, setIntensity] = useState<string | null>(null);

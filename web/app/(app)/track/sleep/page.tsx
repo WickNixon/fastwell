@@ -6,14 +6,18 @@ import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 
-const TODAY = new Date().toISOString().split('T')[0];
 const HOURS_OPTIONS = [5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9];
 const QUALITY_LABELS = ['', 'Poor', 'Restless', 'Okay', 'Good', 'Great'];
+
+function getTodayNZ() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
+}
 
 export default function TrackSleepPage() {
   const { profile, user } = useAuth();
   const supabase = createClient();
   const router = useRouter();
+  const TODAY = getTodayNZ();
   const [hours, setHours] = useState<number | null>(null);
   const [quality, setQuality] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);

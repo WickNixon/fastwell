@@ -18,12 +18,16 @@ function getZone(val: number) {
   return ZONES.find(z => val >= z.min && val < z.max) ?? ZONES[0];
 }
 
+function getTodayNZ() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
+}
+
 export default function KetonesPage() {
   const { profile, user } = useAuth();
   const supabase = createClient();
   const router = useRouter();
   const [value, setValue] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getTodayNZ);
   const [history, setHistory] = useState<Biomarker[]>([]);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);

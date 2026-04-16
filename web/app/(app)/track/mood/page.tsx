@@ -15,13 +15,15 @@ const MOODS = [
   { value: 5, label: 'Wonderful', icon: '😊' },
 ];
 
-function isoDate(d: Date) { return d.toISOString().split('T')[0]; }
-const TODAY = isoDate(new Date());
+function isoDate(d: Date) {
+  return d.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
+}
 
 export default function TrackMoodPage() {
   const { profile, user } = useAuth();
   const supabase = createClient();
   const router = useRouter();
+  const TODAY = isoDate(new Date());
   const [selected, setSelected] = useState<number | null>(null);
   const [trend, setTrend] = useState<HealthEntry[]>([]);
   const [saving, setSaving] = useState(false);

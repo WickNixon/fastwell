@@ -48,7 +48,9 @@ function getGoalHours(protocol: string, customHrs: number): number {
   return m ? parseFloat(m[1]) : customHrs;
 }
 
-function isoDate(d: Date) { return d.toISOString().split('T')[0]; }
+function isoDate(d: Date) {
+  return d.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -539,6 +541,9 @@ export default function DashboardPage() {
   const [addModal, setAddModal] = useState(false);
   const [goalEditHabit, setGoalEditHabit] = useState<HabitDef | null>(null);
 
+  // Habit error
+  const [habitError, setHabitError] = useState('');
+
   // Insights
   const [insights, setInsights] = useState<{ id: string; insight_text: string }[]>([]);
 
@@ -685,16 +690,17 @@ export default function DashboardPage() {
       .eq('id', activeFast.id);
     setActiveFast(null);
     setElapsed(0);
-    router.push('/fasting/timer');
+    router.push('/dashboard');
   };
 
   const handleTick = async (habit: HabitDef) => {
     if (todayEntries.has(habit.key) || !user) return;
+    setHabitError('');
     // Optimistic update immediately
     setTodayEntries(prev => new Set([...prev, habit.key]));
     setCompletedDates(prev => new Set([...prev, today]));
     // Save to Supabase immediately — don't wait for memo
-    await supabase.from('health_entries').upsert({
+    const { error } = await supabase.from('health_entries').upsert({
       user_id: user.id,
       entry_date: today,
       metric: habit.key,
@@ -702,6 +708,13 @@ export default function DashboardPage() {
       unit: 'check',
       source: 'manual',
     }, { onConflict: 'user_id,entry_date,metric,source' });
+    if (error) {
+      console.error('Habit save error:', error);
+      setHabitError(error.message);
+      // Revert optimistic update
+      setTodayEntries(prev => { const next = new Set(prev); next.delete(habit.key); return next; });
+      return;
+    }
     // Open memo sheet for optional emoji/note enrichment
     setBottomSheet(habit);
   };
@@ -790,6 +803,11 @@ export default function DashboardPage() {
       {/* Habit Cards */}
       <div className="section">
         <p className="section-label mb-10">Today's habits</p>
+        {habitError && (
+          <div style={{ background: '#FFF3F3', border: '1px solid #FFCDD2', color: '#C62828', borderRadius: 10, padding: '10px 14px', marginBottom: 12, fontSize: 13, fontFamily: 'Lato, sans-serif' }}>
+            {habitError}
+          </div>
+        )}
         {allHabits.map(habit => (
           <HabitCard
             key={habit.key}

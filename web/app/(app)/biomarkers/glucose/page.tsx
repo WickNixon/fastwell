@@ -7,13 +7,17 @@ import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { Biomarker } from '@/lib/types';
 
+function getTodayNZ() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
+}
+
 export default function GlucosePage() {
   const { profile, user } = useAuth();
   const supabase = createClient();
   const router = useRouter();
   const [unit, setUnit] = useState<'mmol' | 'mgdl'>('mmol');
   const [value, setValue] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getTodayNZ);
   const [notes, setNotes] = useState('');
   const [history, setHistory] = useState<Biomarker[]>([]);
   const [saving, setSaving] = useState(false);

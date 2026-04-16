@@ -7,12 +7,15 @@ import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { HealthEntry } from '@/lib/types';
 
-const TODAY = new Date().toISOString().split('T')[0];
+function getTodayNZ() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
+}
 
 export default function TrackWeightPage() {
   const { profile, user } = useAuth();
   const supabase = createClient();
   const router = useRouter();
+  const TODAY = getTodayNZ();
   const [value, setValue] = useState('');
   const [history, setHistory] = useState<HealthEntry[]>([]);
   const [saving, setSaving] = useState(false);

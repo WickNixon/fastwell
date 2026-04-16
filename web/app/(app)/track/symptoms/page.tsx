@@ -7,7 +7,9 @@ import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { SymptomLog } from '@/lib/types';
 
-const TODAY = new Date().toISOString().split('T')[0];
+function getTodayNZ() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
+}
 
 const SYMPTOMS = [
   { key: 'hot_flush', label: 'Hot flush', icon: '🔥' },
@@ -28,6 +30,7 @@ export default function TrackSymptomsPage() {
   const { profile, user } = useAuth();
   const supabase = createClient();
   const router = useRouter();
+  const TODAY = getTodayNZ();
   const [logged, setLogged] = useState<SymptomLog[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState('');
