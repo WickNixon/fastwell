@@ -148,6 +148,174 @@ function DaySummary({ dateStr, entries }: { dateStr: string; entries: DayEntry[]
   );
 }
 
+// ─── Trend Charts ─────────────────────────────────────────────────────────────
+
+interface ChartPoint { label: string; value: number }
+
+function BarChart({ points, color = '#5C8A34' }: { points: ChartPoint[]; color?: string }) {
+  if (!points.length) return null;
+  const max = Math.max(...points.map(p => p.value), 0.001);
+  const H = 60; const W = 100;
+  const barW = W / points.length - 1;
+  return (
+    <svg viewBox={`0 0 ${W} ${H + 16}`} style={{ width: '100%', height: 76 }} preserveAspectRatio="none">
+      {points.map((p, i) => {
+        const h = (p.value / max) * H;
+        const x = i * (W / points.length);
+        return (
+          <g key={i}>
+            <rect x={x} y={H - h} width={barW} height={h} fill={color} rx={1} opacity={0.85} />
+            {points.length <= 12 && (
+              <text x={x + barW / 2} y={H + 12} textAnchor="middle" fontSize={6} fill="#7A9A6A" fontFamily="Montserrat,sans-serif">
+                {p.label}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function LineChart({ points, color = '#5C8A34' }: { points: ChartPoint[]; color?: string }) {
+  if (points.length < 2) return <BarChart points={points} color={color} />;
+  const max = Math.max(...points.map(p => p.value), 0.001);
+  const min = Math.min(...points.map(p => p.value));
+  const range = max - min || 1;
+  const H = 60; const W = 100;
+  const toX = (i: number) => (i / (points.length - 1)) * W;
+  const toY = (v: number) => H - ((v - min) / range) * H;
+  const poly = points.map((p, i) => `${toX(i)},${toY(p.value)}`).join(' ');
+  return (
+    <svg viewBox={`0 0 ${W} ${H + 16}`} style={{ width: '100%', height: 76 }} preserveAspectRatio="none">
+      <polyline points={poly} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
+      {points.map((p, i) => (
+        <g key={i}>
+          <circle cx={toX(i)} cy={toY(p.value)} r={1.5} fill={color} />
+          {points.length <= 12 && (
+            <text x={toX(i)} y={H + 12} textAnchor="middle" fontSize={6} fill="#7A9A6A" fontFamily="Montserrat,sans-serif">
+              {p.label}
+            </text>
+          )}
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+function ChartCard({
+  title, average, unit, points, type, color,
+}: {
+  title: string; average: string | null; unit: string;
+  points: ChartPoint[]; type: 'bar' | 'line'; color: string;
+}) {
+  return (
+    <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{title}</p>
+        {average && (
+          <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 13, color }}>
+            avg {average} <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-muted)' }}>{unit}</span>
+          </p>
+        )}
+      </div>
+      {points.length > 0 ? (
+        type === 'bar' ? <BarChart points={points} color={color} /> : <LineChart points={points} color={color} />
+      ) : (
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', padding: '12px 0', textAlign: 'center' }}>
+          No data yet for this period.
+        </p>
+      )}
+    </div>
+  );
+}
+
+interface TrendData {
+  fasting: ChartPoint[];
+  water: ChartPoint[];
+  sleep: ChartPoint[];
+  energy: ChartPoint[];
+  weight: ChartPoint[];
+  steps: ChartPoint[];
+}
+
+function buildPoints(
+  period: 'week' | 'month' | 'year',
+  rawEntries: { entry_date: string; metric: string; value: number }[],
+  fastSessions: { started_at: string; duration_minutes: number | null }[],
+): TrendData {
+  const today = new Date();
+  const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const DAY_ABBRS = ['SU','MO','TU','WE','TH','FR','SA'];
+
+  const metricMap = (metric: string) => {
+    const map: Record<string, number[]> = {};
+    rawEntries.filter(e => e.metric === metric).forEach(e => { (map[e.entry_date] ??= []).push(e.value); });
+    return map;
+  };
+
+  if (period === 'week') {
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today); d.setDate(today.getDate() - 6 + i);
+      return { str: isoDate(d), label: DAY_ABBRS[d.getDay()] };
+    });
+    const avgMap = (metric: string) => {
+      const m = metricMap(metric);
+      return days.map(({ str, label }) => {
+        const vals = m[str] ?? [];
+        return { label, value: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0 };
+      });
+    };
+    const fastMap = (() => {
+      const m: Record<string, number[]> = {};
+      fastSessions.forEach(f => { const d = isoDate(new Date(f.started_at)); (m[d] ??= []).push(f.duration_minutes ?? 0); });
+      return days.map(({ str, label }) => { const v = m[str] ?? []; return { label, value: v.length ? v.reduce((a,b)=>a+b,0)/v.length/60 : 0 }; });
+    })();
+    return { fasting: fastMap, water: avgMap('water_ml'), sleep: avgMap('sleep_hours'), energy: avgMap('energy_level'), weight: avgMap('weight'), steps: avgMap('steps') };
+  }
+
+  if (period === 'month') {
+    const days = Array.from({ length: 30 }, (_, i) => {
+      const d = new Date(today); d.setDate(today.getDate() - 29 + i);
+      return { str: isoDate(d), label: String(d.getDate()) };
+    });
+    const avgMap = (metric: string) => {
+      const m = metricMap(metric);
+      return days.map(({ str, label }) => { const v = m[str] ?? []; return { label, value: v.length ? v.reduce((a,b)=>a+b,0)/v.length : 0 }; });
+    };
+    const fastMap = (() => {
+      const m: Record<string, number[]> = {};
+      fastSessions.forEach(f => { const d = isoDate(new Date(f.started_at)); (m[d] ??= []).push(f.duration_minutes ?? 0); });
+      return days.map(({ str, label }) => { const v = m[str] ?? []; return { label, value: v.length ? v.reduce((a,b)=>a+b,0)/v.length/60 : 0 }; });
+    })();
+    return { fasting: fastMap, water: avgMap('water_ml'), sleep: avgMap('sleep_hours'), energy: avgMap('energy_level'), weight: avgMap('weight'), steps: avgMap('steps') };
+  }
+
+  // Year — 12 months
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(today.getFullYear(), today.getMonth() - 11 + i, 1);
+    return { year: d.getFullYear(), month: d.getMonth(), label: MONTH_LABELS[d.getMonth()] };
+  });
+  const monthKey = (dateStr: string) => { const d = new Date(dateStr); return `${d.getFullYear()}-${d.getMonth()}`; };
+  const avgMap = (metric: string) => {
+    const m: Record<string, number[]> = {};
+    rawEntries.filter(e => e.metric === metric).forEach(e => { const k = monthKey(e.entry_date); (m[k] ??= []).push(e.value); });
+    return months.map(({ year, month, label }) => { const v = m[`${year}-${month}`] ?? []; return { label, value: v.length ? v.reduce((a,b)=>a+b,0)/v.length : 0 }; });
+  };
+  const fastMap = (() => {
+    const m: Record<string, number[]> = {};
+    fastSessions.forEach(f => { const k = monthKey(isoDate(new Date(f.started_at))); (m[k] ??= []).push(f.duration_minutes ?? 0); });
+    return months.map(({ year, month, label }) => { const v = m[`${year}-${month}`] ?? []; return { label, value: v.length ? v.reduce((a,b)=>a+b,0)/v.length/60 : 0 }; });
+  })();
+  return { fasting: fastMap, water: avgMap('water_ml'), sleep: avgMap('sleep_hours'), energy: avgMap('energy_level'), weight: avgMap('weight'), steps: avgMap('steps') };
+}
+
+function avgLabel(points: ChartPoint[], decimals = 1): string | null {
+  const nonZero = points.filter(p => p.value > 0);
+  if (!nonZero.length) return null;
+  return (nonZero.reduce((s, p) => s + p.value, 0) / nonZero.length).toFixed(decimals);
+}
+
 // ─── Food Log Section ─────────────────────────────────────────────────────────
 // Requires food_logs table in Supabase:
 // CREATE TABLE food_logs (
@@ -420,6 +588,10 @@ export default function MePage() {
   const [showAllCalendar, setShowAllCalendar] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
 
+  // Trend charts
+  const [trendPeriod, setTrendPeriod] = useState<'week' | 'month' | 'year'>('week');
+  const [trendData, setTrendData] = useState<TrendData | null>(null);
+
   // Period results
   const [period, setPeriod] = useState<'7d' | '30d' | '3m' | '6m' | '12m'>('30d');
   const [fasts, setFasts] = useState<FastingSession[]>([]);
@@ -476,6 +648,25 @@ export default function MePage() {
     } catch {}
   }, [profile]);
 
+  const loadTrends = useCallback(async () => {
+    if (!profile) return;
+    const sb = getSupabase();
+    try {
+      const yearAgo = new Date(); yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+      const [{ data: entries }, { data: fasts }] = await Promise.all([
+        sb.from('health_entries').select('entry_date,metric,value')
+          .eq('user_id', profile.id).gte('entry_date', isoDate(yearAgo)),
+        sb.from('fasting_sessions').select('started_at,duration_minutes')
+          .eq('user_id', profile.id).not('ended_at', 'is', null)
+          .gte('started_at', yearAgo.toISOString()),
+      ]);
+      setTrendData(buildPoints(trendPeriod,
+        (entries ?? []) as { entry_date: string; metric: string; value: number }[],
+        (fasts ?? []) as { started_at: string; duration_minutes: number | null }[],
+      ));
+    } catch {}
+  }, [profile, trendPeriod]);
+
   const loadPeriod = useCallback(async () => {
     if (!profile) return;
     setLoading(true);
@@ -509,7 +700,8 @@ export default function MePage() {
     loadStats();
     loadCalendar();
     loadPeriod();
-  }, [authLoading, loadStats, loadCalendar, loadPeriod]);
+    loadTrends();
+  }, [authLoading, loadStats, loadCalendar, loadPeriod, loadTrends]);
 
   useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
 
@@ -608,6 +800,34 @@ export default function MePage() {
 
       {/* Food log */}
       {profile?.id && <FoodLogSection userId={profile.id} />}
+
+      {/* Trend charts */}
+      <div className="section">
+        <p className="section-label mb-12">Trends</p>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+          {(['week', 'month', 'year'] as const).map(p => (
+            <button key={p} onClick={() => setTrendPeriod(p)} style={{
+              flex: 1, padding: '8px 0', borderRadius: 8, cursor: 'pointer',
+              border: `1.5px solid ${trendPeriod === p ? 'var(--primary)' : 'var(--border)'}`,
+              backgroundColor: trendPeriod === p ? 'var(--primary-pale)' : 'var(--surface)',
+              fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13,
+              color: trendPeriod === p ? 'var(--primary)' : 'var(--text-muted)',
+            }}>
+              {p.charAt(0).toUpperCase() + p.slice(1)}
+            </button>
+          ))}
+        </div>
+        {trendData && (
+          <>
+            <ChartCard title="Fasting duration" average={avgLabel(trendData.fasting)} unit="h" points={trendData.fasting} type="bar" color="#5C8A34" />
+            <ChartCard title="Water intake" average={avgLabel(trendData.water, 0)} unit="ml" points={trendData.water} type="bar" color="#4A90D9" />
+            <ChartCard title="Sleep" average={avgLabel(trendData.sleep)} unit="h" points={trendData.sleep} type="line" color="#6B9B4A" />
+            <ChartCard title="Energy level" average={avgLabel(trendData.energy)} unit="/5" points={trendData.energy} type="line" color="#D9C44A" />
+            <ChartCard title="Weight" average={avgLabel(trendData.weight)} unit={profile?.weight_unit ?? 'kg'} points={trendData.weight} type="line" color="#D06820" />
+            <ChartCard title="Steps" average={avgLabel(trendData.steps, 0)} unit="steps" points={trendData.steps} type="bar" color="#9B6B4A" />
+          </>
+        )}
+      </div>
 
       {/* Period filter + results */}
       <div className="filter-tabs mb-20">
