@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
-import type { FastingSession } from '@/lib/types';
+import type { FastingSession, UserBadge } from '@/lib/types';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -41,8 +41,13 @@ const HABIT_LIBRARY: HabitDef[] = [
 ];
 
 const MEMO_EMOJIS = ['😩', '😕', '😐', '🙂', '😄'];
-const PROTOCOLS = ['16:8', '18:6', '20:4', '24h'];
-const PROTOCOL_HOURS: Record<string, number> = { '16:8': 16, '18:6': 18, '20:4': 20, '24h': 24 };
+const PROTOCOLS = ['17h', '24h', 'Custom'];
+const PROTOCOL_HOURS: Record<string, number> = { '17h': 17, '24h': 24 };
+function getGoalHours(protocol: string, customHrs: number): number {
+  if (protocol in PROTOCOL_HOURS) return PROTOCOL_HOURS[protocol];
+  const m = protocol.match(/^(\d+(?:\.\d+)?)h$/);
+  return m ? parseFloat(m[1]) : customHrs;
+}
 
 function isoDate(d: Date) { return d.toISOString().split('T')[0]; }
 
@@ -129,18 +134,23 @@ function CalendarStrip({ completedDates }: { completedDates: Set<string> }) {
 // ─── Fasting Card ─────────────────────────────────────────────────────────────
 
 function FastingCard({
-  activeFast, elapsed, selectedProtocol, setSelectedProtocol, onStart, onEnd, starting,
+  activeFast, elapsed, selectedProtocol, setSelectedProtocol,
+  customHours, setCustomHours, goalHours, onStart, onEnd, starting,
 }: {
   activeFast: FastingSession | null;
   elapsed: number;
   selectedProtocol: string;
   setSelectedProtocol: (p: string) => void;
+  customHours: number;
+  setCustomHours: (h: number) => void;
+  goalHours: number;
   onStart: () => void;
   onEnd: () => void;
   starting: boolean;
 }) {
-  const goalHours = PROTOCOL_HOURS[activeFast?.protocol ?? selectedProtocol] ?? 16;
-  const progress = Math.min(elapsed / (goalHours * 3600), 1);
+  const goalSecs = goalHours * 3600;
+  const remaining = Math.max(goalSecs - elapsed, 0);
+  const progress = Math.min(elapsed / goalSecs, 1);
 
   if (activeFast) {
     return (
@@ -157,13 +167,15 @@ function FastingCard({
           </span>
         </div>
         <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 38, color: '#FFFFFF', letterSpacing: 2, marginBottom: 8 }}>
-          {formatElapsed(elapsed)}
+          {formatElapsed(remaining)}
         </p>
         <div style={{ height: 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, marginBottom: 8 }}>
           <div style={{ height: 6, backgroundColor: '#FFFFFF', borderRadius: 3, width: `${progress * 100}%`, transition: 'width 1s linear' }} />
         </div>
         <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', fontFamily: 'Lato, sans-serif', marginBottom: 16 }}>
-          {Math.floor(elapsed / 3600)}h {Math.floor((elapsed % 3600) / 60)}m of {goalHours}h goal
+          {remaining > 0
+            ? `${Math.floor(remaining / 3600)}h ${Math.floor((remaining % 3600) / 60)}m remaining`
+            : 'Window complete — well done.'}
         </p>
         <button
           onClick={onEnd}
@@ -187,7 +199,7 @@ function FastingCard({
       <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14, color: 'var(--text-muted)', marginBottom: 14 }}>
         🕐 Fasting
       </p>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: selectedProtocol === 'Custom' ? 12 : 16 }}>
         {PROTOCOLS.map(p => (
           <button
             key={p}
@@ -204,6 +216,21 @@ function FastingCard({
           </button>
         ))}
       </div>
+      {selectedProtocol === 'Custom' && (
+        <div className="input-group" style={{ marginBottom: 16 }}>
+          <label className="input-label">Hours to fast</label>
+          <input
+            className="input"
+            type="number"
+            min={1}
+            max={72}
+            step={0.5}
+            value={customHours}
+            onChange={e => setCustomHours(Math.max(1, parseFloat(e.target.value) || 1))}
+            placeholder="e.g. 19"
+          />
+        </div>
+      )}
       <button
         className="btn btn-primary"
         onClick={onStart}
@@ -361,6 +388,61 @@ function AddHabitModal({
   );
 }
 
+// ─── Gratification Sheet ─────────────────────────────────────────────────────
+
+function GratificationSheet({
+  reason, badge, onCollect, onViewMilestones,
+}: {
+  reason: 'fast' | 'habits';
+  badge: UserBadge | null;
+  onCollect: () => void;
+  onViewMilestones: () => void;
+}) {
+  return (
+    <div className="modal-overlay">
+      <div className="modal-sheet">
+        <div className="modal-handle" />
+        <p style={{ textAlign: 'center', fontSize: 48, marginBottom: 12 }}>
+          {reason === 'fast' ? '🌿' : '⭐'}
+        </p>
+        <p style={{ textAlign: 'center', fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 22, marginBottom: 8, color: 'var(--text)' }}>
+          {reason === 'fast' ? 'Fast complete.' : 'All habits done today.'}
+        </p>
+        <p style={{ textAlign: 'center', fontFamily: 'Lato, sans-serif', fontSize: 16, color: 'var(--text-muted)', marginBottom: 24, lineHeight: 1.5 }}>
+          {reason === 'fast'
+            ? 'Your body worked hard today. Every hour counts.'
+            : 'Consistency is everything. You showed up for yourself today.'}
+        </p>
+        {badge && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            padding: 16, backgroundColor: '#FFF3E8', borderRadius: 12,
+            border: '1px solid #D06820', marginBottom: 20,
+          }}>
+            <span style={{ fontSize: 36, marginBottom: 8 }}>🏅</span>
+            <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 14, color: '#D06820', textAlign: 'center' }}>
+              Badge earned: {badge.badge_name}
+            </p>
+          </div>
+        )}
+        <button className="btn btn-primary" onClick={onCollect}>
+          {badge ? 'Collect badge' : 'Done'}
+        </button>
+        <button
+          onClick={onViewMilestones}
+          style={{
+            marginTop: 12, background: 'none', border: 'none', cursor: 'pointer',
+            color: 'var(--primary)', fontFamily: 'Lato, sans-serif', fontSize: 14,
+            textDecoration: 'underline', width: '100%', textAlign: 'center', padding: 8,
+          }}
+        >
+          View all milestones
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -371,10 +453,16 @@ export default function DashboardPage() {
   // Fasting state
   const [activeFast, setActiveFast] = useState<FastingSession | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const [selectedProtocol, setSelectedProtocol] = useState('16:8');
+  const [selectedProtocol, setSelectedProtocol] = useState('17h');
+  const [customHours, setCustomHours] = useState(17);
   const [starting, setStarting] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Gratification state
+  const [gratification, setGratification] = useState<{ reason: 'fast' | 'habits'; badge: UserBadge | null } | null>(null);
+  const fastCompleteTriggeredRef = useRef(false);
+  const habitsCompleteTriggeredRef = useRef('');
 
   // Calendar state
   const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
@@ -393,6 +481,23 @@ export default function DashboardPage() {
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const dateLabel = new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long' });
 
+  const goalHours = getGoalHours(
+    activeFast?.protocol ?? (selectedProtocol === 'Custom' ? `${customHours}h` : selectedProtocol),
+    customHours,
+  );
+  const remaining = activeFast ? Math.max(goalHours * 3600 - elapsed, 0) : 0;
+
+  const checkBadge = async (): Promise<UserBadge | null> => {
+    if (!profile) return null;
+    try {
+      const { data } = await getSupabase()
+        .from('user_badges').select('*')
+        .eq('user_id', profile.id).eq('seen', false)
+        .order('earned_at', { ascending: false }).limit(1).maybeSingle();
+      return (data as UserBadge) ?? null;
+    } catch { return null; }
+  };
+
   // Load custom habits from localStorage
   useEffect(() => {
     try {
@@ -402,6 +507,28 @@ export default function DashboardPage() {
   }, []);
 
   const allHabits = [...DEFAULT_HABITS, ...customHabits];
+
+  // Fast completion detection
+  useEffect(() => {
+    if (activeFast && elapsed > 0 && remaining === 0 && !fastCompleteTriggeredRef.current) {
+      fastCompleteTriggeredRef.current = true;
+      checkBadge().then(badge => setGratification({ reason: 'fast', badge }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remaining, activeFast, elapsed]);
+
+  // All habits completion detection
+  useEffect(() => {
+    if (
+      allHabits.length > 0 &&
+      allHabits.every(h => todayEntries.has(h.key)) &&
+      habitsCompleteTriggeredRef.current !== today
+    ) {
+      habitsCompleteTriggeredRef.current = today;
+      checkBadge().then(badge => setGratification({ reason: 'habits', badge }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayEntries, allHabits, today]);
 
   const startTick = useCallback((startTime: Date) => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -456,10 +583,12 @@ export default function DashboardPage() {
   const startFast = async () => {
     if (!user || starting) return;
     setStarting(true);
+    fastCompleteTriggeredRef.current = false;
+    const protocolToStore = selectedProtocol === 'Custom' ? `${customHours}h` : selectedProtocol;
     try {
       const { data } = await supabase
         .from('fasting_sessions')
-        .insert({ user_id: user.id, protocol: selectedProtocol, started_at: new Date().toISOString() })
+        .insert({ user_id: user.id, protocol: protocolToStore, started_at: new Date().toISOString() })
         .select().single();
       if (data) {
         setActiveFast(data as FastingSession);
@@ -467,6 +596,13 @@ export default function DashboardPage() {
       }
     } catch {}
     setStarting(false);
+  };
+
+  const collectBadge = async () => {
+    if (gratification?.badge) {
+      await getSupabase().from('user_badges').update({ seen: true }).eq('id', gratification.badge.id);
+    }
+    setGratification(null);
   };
 
   const endFast = async () => {
@@ -529,6 +665,9 @@ export default function DashboardPage() {
         elapsed={elapsed}
         selectedProtocol={selectedProtocol}
         setSelectedProtocol={setSelectedProtocol}
+        customHours={customHours}
+        setCustomHours={setCustomHours}
+        goalHours={goalHours}
         onStart={startFast}
         onEnd={() => setConfirmEnd(true)}
         starting={starting}
@@ -615,6 +754,16 @@ export default function DashboardPage() {
           existing={allHabits.map(h => h.key)}
           onAdd={addHabit}
           onClose={() => setAddModal(false)}
+        />
+      )}
+
+      {/* Gratification sheet */}
+      {gratification && (
+        <GratificationSheet
+          reason={gratification.reason}
+          badge={gratification.badge}
+          onCollect={collectBadge}
+          onViewMilestones={() => { setGratification(null); router.push('/rewards'); }}
         />
       )}
     </div>

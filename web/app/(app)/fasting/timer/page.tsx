@@ -5,14 +5,20 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
-import type { FastingSession } from '@/lib/types';
+import type { FastingSession, UserBadge } from '@/lib/types';
 
 const PROTOCOLS = [
-  { key: '16:8', label: '16:8', hours: 16 },
-  { key: '18:6', label: '18:6', hours: 18 },
-  { key: '20:4', label: '20:4', hours: 20 },
+  { key: '17h', label: '17h', hours: 17 },
   { key: '24h', label: '24h', hours: 24 },
+  { key: 'Custom', label: 'Custom', hours: 0 },
 ];
+
+function getGoalHours(protocol: string, customHrs: number): number {
+  const HOURS: Record<string, number> = { '17h': 17, '24h': 24 };
+  if (protocol in HOURS) return HOURS[protocol];
+  const m = protocol.match(/^(\d+(?:\.\d+)?)h$/);
+  return m ? parseFloat(m[1]) : customHrs;
+}
 
 export default function FastingTimerPage() {
   const { profile, user } = useAuth();
@@ -20,13 +26,15 @@ export default function FastingTimerPage() {
   const router = useRouter();
   const [activeFast, setActiveFast] = useState<FastingSession | null>(null);
   const [elapsed, setElapsed] = useState(0); // seconds
-  const [selectedProtocol, setSelectedProtocol] = useState('16:8');
+  const [selectedProtocol, setSelectedProtocol] = useState('17h');
+  const [customHours, setCustomHours] = useState(17);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [confirm, setConfirm] = useState(false);
-  const [complete, setComplete] = useState(false);
+  const [gratification, setGratification] = useState<{ badge: UserBadge | null } | null>(null);
   const [error, setError] = useState('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fastCompleteTriggeredRef = useRef(false);
 
   const startTick = useCallback((startTime: Date) => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -59,9 +67,11 @@ export default function FastingTimerPage() {
     if (!user || starting) return;
     setStarting(true);
     setError('');
+    fastCompleteTriggeredRef.current = false;
+    const protocolToStore = selectedProtocol === 'Custom' ? `${customHours}h` : selectedProtocol;
     const { data, error: err } = await supabase
       .from('fasting_sessions')
-      .insert({ user_id: user.id, protocol: selectedProtocol, started_at: new Date().toISOString() })
+      .insert({ user_id: user.id, protocol: protocolToStore, started_at: new Date().toISOString() })
       .select()
       .single();
     if (err) {
@@ -90,8 +100,28 @@ export default function FastingTimerPage() {
     }
     setActiveFast(null);
     setElapsed(0);
-    setComplete(true);
-    setTimeout(() => router.push('/dashboard'), 2000);
+    // Check for new badge, then show gratification sheet
+    try {
+      if (profile) {
+        const { data: badge } = await getSupabase()
+          .from('user_badges').select('*')
+          .eq('user_id', profile.id).eq('seen', false)
+          .order('earned_at', { ascending: false }).limit(1).maybeSingle();
+        setGratification({ badge: (badge as UserBadge) ?? null });
+      } else {
+        setGratification({ badge: null });
+      }
+    } catch {
+      setGratification({ badge: null });
+    }
+  };
+
+  const collectBadge = async () => {
+    if (gratification?.badge) {
+      await getSupabase().from('user_badges').update({ seen: true }).eq('id', gratification.badge.id);
+    }
+    setGratification(null);
+    router.push('/dashboard');
   };
 
   const formatTime = (s: number) => {
@@ -101,28 +131,25 @@ export default function FastingTimerPage() {
     return `${h}:${m}:${sec}`;
   };
 
-  const goalHours = PROTOCOLS.find(p => p.key === (activeFast?.protocol ?? selectedProtocol))?.hours ?? 16;
+  const goalHours = getGoalHours(
+    activeFast?.protocol ?? (selectedProtocol === 'Custom' ? `${customHours}h` : selectedProtocol),
+    customHours,
+  );
   const goalSeconds = goalHours * 3600;
   const progress = Math.min(elapsed / goalSeconds, 1);
   const remaining = Math.max(goalSeconds - elapsed, 0);
 
+  // Fast completion detection
+  useEffect(() => {
+    if (activeFast && elapsed > 0 && remaining === 0 && !fastCompleteTriggeredRef.current) {
+      fastCompleteTriggeredRef.current = true;
+      breakFast();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remaining, activeFast, elapsed]);
+
   if (loading) {
     return <div className="loading-screen" style={{ background: 'var(--primary)' }}><div className="spinner" style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /></div>;
-  }
-
-  // Completion screen
-  if (complete) {
-    return (
-      <div className="timer-screen" style={{ justifyContent: 'center', textAlign: 'center' }}>
-        <div style={{ fontSize: 64, marginBottom: 24 }}>🌿</div>
-        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 24, color: '#FFFFFF', marginBottom: 12 }}>
-          Fast complete.
-        </p>
-        <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 18, color: 'rgba(255,255,255,0.85)' }}>
-          Well done{profile?.first_name ? `, ${profile.first_name}` : ''}.
-        </p>
-      </div>
-    );
   }
 
   if (activeFast) {
@@ -141,7 +168,7 @@ export default function FastingTimerPage() {
         </p>
 
         <p className="timer-text" style={{ marginBottom: 12 }}>
-          {formatTime(elapsed)}
+          {formatTime(remaining)}
         </p>
 
         <p style={{ color: 'rgba(255,255,255,0.8)', fontFamily: 'Lato, sans-serif', fontSize: 16, marginBottom: 24 }}>
@@ -178,6 +205,46 @@ export default function FastingTimerPage() {
             </div>
           </div>
         )}
+
+        {gratification && (
+          <div className="modal-overlay">
+            <div className="modal-sheet">
+              <div className="modal-handle" />
+              <p style={{ textAlign: 'center', fontSize: 48, marginBottom: 12 }}>🌿</p>
+              <p style={{ textAlign: 'center', fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 22, marginBottom: 8, color: 'var(--text)' }}>
+                Fast complete.
+              </p>
+              <p style={{ textAlign: 'center', fontFamily: 'Lato, sans-serif', fontSize: 16, color: 'var(--text-muted)', marginBottom: 24, lineHeight: 1.5 }}>
+                Your body worked hard today. Every hour counts.
+              </p>
+              {gratification.badge && (
+                <div style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  padding: 16, backgroundColor: '#FFF3E8', borderRadius: 12,
+                  border: '1px solid #D06820', marginBottom: 20,
+                }}>
+                  <span style={{ fontSize: 36, marginBottom: 8 }}>🏅</span>
+                  <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 14, color: '#D06820', textAlign: 'center' }}>
+                    Badge earned: {gratification.badge.badge_name}
+                  </p>
+                </div>
+              )}
+              <button className="btn btn-primary" onClick={collectBadge}>
+                {gratification.badge ? 'Collect badge' : 'Done'}
+              </button>
+              <button
+                onClick={() => { collectBadge(); router.push('/rewards'); }}
+                style={{
+                  marginTop: 12, background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--primary)', fontFamily: 'Lato, sans-serif', fontSize: 14,
+                  textDecoration: 'underline', width: '100%', textAlign: 'center', padding: 8,
+                }}
+              >
+                View all milestones
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -200,7 +267,7 @@ export default function FastingTimerPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 32 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: selectedProtocol === 'Custom' ? 16 : 32 }}>
         {PROTOCOLS.map(p => (
           <button
             key={p.key}
@@ -215,10 +282,26 @@ export default function FastingTimerPage() {
             <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 18, color: selectedProtocol === p.key ? 'var(--primary)' : 'var(--text)' }}>
               {p.label}
             </p>
-            <p className="body-sm">{p.hours}h fast</p>
+            <p className="body-sm">{p.key === 'Custom' ? 'Set your hours' : `${p.hours}h fast`}</p>
           </button>
         ))}
       </div>
+
+      {selectedProtocol === 'Custom' && (
+        <div className="input-group" style={{ marginBottom: 24 }}>
+          <label className="input-label">Hours to fast</label>
+          <input
+            className="input"
+            type="number"
+            min={1}
+            max={72}
+            step={0.5}
+            value={customHours}
+            onChange={e => setCustomHours(Math.max(1, parseFloat(e.target.value) || 1))}
+            placeholder="e.g. 19"
+          />
+        </div>
+      )}
 
       <button className="btn btn-primary" onClick={startFast} disabled={starting}>
         {starting ? 'Starting…' : 'Start fast'}
