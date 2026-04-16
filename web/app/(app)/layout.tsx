@@ -35,10 +35,11 @@ function TrackIcon({ active }: { active: boolean }) {
   );
 }
 
-function ResultsIcon({ active }: { active: boolean }) {
+function MeIcon({ active }: { active: boolean }) {
   return (
-    <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8}>
-      <polyline points="4 18 8 12 12 15 16 9 20 6" strokeLinecap="round" strokeLinejoin="round" />
+    <svg className="nav-icon" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={active ? 0 : 1.8}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -56,7 +57,7 @@ const NAV = [
   { href: '/dashboard', label: 'Home', Icon: HomeIcon },
   { href: '/fasting', label: 'Fast', Icon: FastIcon },
   { href: '/track', label: 'Track', Icon: TrackIcon },
-  { href: '/results', label: 'Results', Icon: ResultsIcon },
+  { href: '/results', label: 'Me', Icon: MeIcon },
   { href: '/settings', label: 'Settings', Icon: SettingsIcon },
 ];
 
