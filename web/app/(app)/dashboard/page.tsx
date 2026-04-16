@@ -28,11 +28,11 @@ const DEFAULT_HABITS: HabitDef[] = [
 
 const HABIT_LIBRARY: HabitDef[] = [
   { key: 'walking', label: 'Walking', icon: '🚶', href: '/track/steps', goal: '10,000 steps' },
-  { key: 'meditation', label: 'Meditation', icon: '🧘', href: '/track', goal: '10 mins' },
-  { key: 'reading', label: 'Read a book', icon: '📚', href: '/track', goal: '20 mins' },
-  { key: 'caffeine', label: 'Caffeine intake', icon: '☕', href: '/track', goal: 'Daily log' },
-  { key: 'veggies', label: 'Eat fruits & veggies', icon: '🥦', href: '/track', goal: 'Daily tick' },
-  { key: 'review', label: 'Review your day', icon: '🌙', href: '/track', goal: 'Daily tick' },
+  { key: 'meditation', label: 'Meditation', icon: '🧘', href: '/track/meditation', goal: '10 mins' },
+  { key: 'reading', label: 'Read a book', icon: '📚', href: '/track/reading', goal: '20 mins' },
+  { key: 'caffeine', label: 'Caffeine intake', icon: '☕', href: '/track/caffeine', goal: 'Daily log' },
+  { key: 'veggies', label: 'Eat fruits & veggies', icon: '🥦', href: '/track/fruits', goal: 'Daily tick' },
+  { key: 'review', label: 'Review your day', icon: '🌙', href: '/track/review', goal: 'Daily tick' },
   { key: 'mood', label: 'Mood check', icon: '😊', href: '/track/mood', goal: 'Daily' },
   { key: 'energy', label: 'Energy check', icon: '⚡', href: '/track/energy', goal: 'Daily' },
   { key: 'symptoms', label: 'Symptoms log', icon: '🌡', href: '/track/symptoms', goal: 'Daily' },
@@ -564,6 +564,7 @@ export default function DashboardPage() {
   // Habit state
   const [customHabits, setCustomHabits] = useState<HabitDef[]>([]);
   const [customGoals, setCustomGoals] = useState<Record<string, string>>({});
+  const [customHabitsDb, setCustomHabitsDb] = useState<Record<string, { goal: number; unit: string }>>({});
   const [todayEntries, setTodayEntries] = useState<Set<string>>(new Set());
   const [todayMemos, setTodayMemos] = useState<Record<string, { emoji: string | null; memo: string | null }>>({});
   const [todayValues, setTodayValues] = useState<Record<string, number>>({});
@@ -713,6 +714,21 @@ export default function DashboardPage() {
     } catch {}
 
     try {
+      // Custom habit goals from profiles
+      const { data: profileData } = await sb.from('profiles').select('custom_habits').eq('id', profile.id).maybeSingle();
+      if (profileData?.custom_habits) {
+        const ch = profileData.custom_habits as Record<string, { goal: number; unit: string }>;
+        setCustomHabitsDb(ch);
+        const goals: Record<string, string> = {};
+        for (const [key, val] of Object.entries(ch)) {
+          goals[key] = `${val.goal} ${val.unit}`;
+        }
+        setCustomGoals(prev => ({ ...prev, ...goals }));
+        try { localStorage.setItem('fastwell_habit_goals', JSON.stringify({ ...JSON.parse(localStorage.getItem('fastwell_habit_goals') ?? '{}'), ...goals })); } catch {}
+      }
+    } catch {}
+
+    try {
       // AI insights
       const { data: ins } = await sb
         .from('ai_insights').select('id,insight_text').eq('user_id', profile.id)
@@ -818,10 +834,16 @@ export default function DashboardPage() {
     }
   };
 
-  const saveCustomGoal = (habitKey: string, goal: string) => {
+  const saveCustomGoal = async (habitKey: string, goal: string) => {
     const updated = { ...customGoals, [habitKey]: goal };
     setCustomGoals(updated);
     try { localStorage.setItem('fastwell_habit_goals', JSON.stringify(updated)); } catch {}
+    if (!user) return;
+    const unit = HABIT_UNITS[habitKey] || 'check';
+    const goalNum = goalToNumber(goal, habitKey);
+    const newDb = { ...customHabitsDb, [habitKey]: { goal: goalNum, unit } };
+    setCustomHabitsDb(newDb);
+    await getSupabase().from('profiles').update({ custom_habits: newDb }).eq('id', user.id);
   };
 
   const addHabit = (habit: HabitDef) => {

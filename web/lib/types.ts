@@ -20,6 +20,7 @@ export interface Profile {
   timezone: string;
   weight_unit: string;
   onboarding_complete: boolean;
+  custom_habits: Record<string, { goal: number; unit: string }> | null;
   created_at: string;
   updated_at: string;
 }

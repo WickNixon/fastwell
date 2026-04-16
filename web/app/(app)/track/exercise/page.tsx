@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 
+const HABIT_KEY = 'exercise_minutes';
+const DEFAULT_GOAL = 30;
 const TYPES = ['Walk', 'Run', 'Gym', 'Swim', 'Yoga', 'Cycle', 'Other'];
 const DURATIONS = [15, 20, 30, 45, 60, 90];
 const INTENSITIES = [
@@ -23,52 +25,112 @@ export default function TrackExercisePage() {
   const supabase = createClient();
   const router = useRouter();
   const TODAY = getTodayNZ();
+
+  const [goal, setGoal] = useState(DEFAULT_GOAL);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState('');
+  const [customHabitsDb, setCustomHabitsDb] = useState<Record<string, { goal: number; unit: string }>>({});
+
+  const [todayTotal, setTodayTotal] = useState(0);
   const [type, setType] = useState('Walk');
   const [duration, setDuration] = useState<number | null>(null);
   const [intensity, setIntensity] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!profile) return;
-    getSupabase().from('health_entries').select('value,value_text,notes')
-      .eq('user_id', profile.id).eq('entry_date', TODAY).eq('metric', 'exercise_minutes').eq('source', 'manual')
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          setDuration(data.value);
-          if (data.value_text) {
-            const parts = data.value_text.split('|');
-            setType(parts[0] ?? 'Walk');
-            if (parts[1]) setIntensity(parts[1]);
-          }
-        }
-      });
-  }, [profile]);
+    const [{ data: entry }, { data: profileData }] = await Promise.all([
+      getSupabase().from('health_entries').select('value,value_text')
+        .eq('user_id', profile.id).eq('entry_date', TODAY).eq('metric', HABIT_KEY).eq('source', 'manual').maybeSingle(),
+      getSupabase().from('profiles').select('custom_habits').eq('id', profile.id).maybeSingle(),
+    ]);
+    if (entry) {
+      setTodayTotal(entry.value ?? 0);
+      if (entry.value_text) {
+        const parts = entry.value_text.split('|');
+        setType(parts[0] ?? 'Walk');
+        if (parts[1]) setIntensity(parts[1]);
+      }
+    }
+    if (profileData?.custom_habits) {
+      const ch = profileData.custom_habits as Record<string, { goal: number; unit: string }>;
+      setCustomHabitsDb(ch);
+      if (ch.exercise?.goal) setGoal(ch.exercise.goal);
+    }
+  }, [profile, TODAY]);
+
+  useEffect(() => { load(); }, [load]);
 
   const save = async () => {
     if (!duration || !user || saving) return;
     setSaving(true);
+    const newTotal = todayTotal + duration;
     const valueText = intensity ? `${type}|${intensity}` : type;
     const { error } = await supabase.from('health_entries')
       .upsert({
-        user_id: user.id, entry_date: TODAY, metric: 'exercise_minutes',
-        value: duration, value_text: valueText, unit: 'minutes', source: 'manual',
+        user_id: user.id, entry_date: TODAY, metric: HABIT_KEY,
+        value: newTotal, value_text: valueText, unit: 'minutes', source: 'manual',
       }, { onConflict: 'user_id,entry_date,metric,source' });
     if (error) {
       setFeedback({ ok: false, msg: error.message });
     } else {
-      setFeedback({ ok: true, msg: 'Saved' });
-      setTimeout(() => { setFeedback(null); router.back(); }, 1200);
+      setTodayTotal(newTotal);
+      setDuration(null);
+      setFeedback({ ok: true, msg: `${newTotal} of ${goal} mins logged today` });
+      setTimeout(() => { setFeedback(null); }, 2000);
     }
     setSaving(false);
   };
 
+  const saveGoal = async (newGoal: number) => {
+    setGoal(newGoal);
+    setEditingGoal(false);
+    if (!user) return;
+    const newDb = { ...customHabitsDb, exercise: { goal: newGoal, unit: 'mins' } };
+    setCustomHabitsDb(newDb);
+    await getSupabase().from('profiles').update({ custom_habits: newDb }).eq('id', user.id);
+  };
+
+  const pct = goal > 0 ? Math.min((todayTotal / goal) * 100, 100) : 0;
+
   return (
     <div className="page page-top">
       <button onClick={() => router.back()} style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Lato, sans-serif' }}>← Back</button>
-      <h1 className="h1 mb-8">Exercise</h1>
-      <p className="body-sm mb-24">Log today's movement</p>
+      <h1 className="h1 mb-0">🏃 Exercise</h1>
+
+      {/* Goal row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, marginTop: 6 }}>
+        {editingGoal ? (
+          <>
+            <input type="number" className="input" style={{ maxWidth: 80 }} value={goalInput}
+              onChange={e => setGoalInput(e.target.value)} autoFocus />
+            <span style={{ color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', fontSize: 14 }}>mins</span>
+            <button className="btn btn-primary btn-sm" onClick={() => saveGoal(parseInt(goalInput) || DEFAULT_GOAL)}>Save</button>
+            <button onClick={() => setEditingGoal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 18, lineHeight: 1, padding: 2 }}>✕</button>
+          </>
+        ) : (
+          <>
+            <span style={{ fontSize: 14, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>Goal: {goal} mins today</span>
+            <button onClick={() => { setGoalInput(String(goal)); setEditingGoal(true); }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--text-muted)', padding: 2 }}
+              aria-label="Edit goal">✎</button>
+          </>
+        )}
+      </div>
+
+      {/* Today progress */}
+      {todayTotal > 0 && (
+        <div style={{ textAlign: 'center', marginBottom: 20 }}>
+          <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 32, color: 'var(--primary)', lineHeight: 1 }}>
+            {todayTotal}<span style={{ fontSize: 16 }}> of {goal} mins</span>
+          </p>
+          <p className="body-sm mt-4">logged today</p>
+          <div style={{ height: 8, backgroundColor: 'var(--border)', borderRadius: 4, margin: '10px auto', maxWidth: 280 }}>
+            <div style={{ height: 8, backgroundColor: 'var(--primary)', borderRadius: 4, width: `${pct}%`, transition: 'width 0.4s ease' }} />
+          </div>
+        </div>
+      )}
 
       {feedback && (
         <div style={{
@@ -104,12 +166,12 @@ export default function TrackExercisePage() {
       </div>
 
       <div className="section">
-        <p className="section-label mb-12">Duration</p>
+        <p className="section-label mb-12">Add {todayTotal > 0 ? 'more — ' : ''}duration</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
           {DURATIONS.map(d => (
             <button
               key={d}
-              onClick={() => setDuration(d)}
+              onClick={() => setDuration(duration === d ? null : d)}
               style={{
                 padding: 14, borderRadius: 12,
                 border: `2px solid ${duration === d ? 'var(--primary)' : 'var(--border)'}`,
@@ -146,7 +208,7 @@ export default function TrackExercisePage() {
       </div>
 
       <button className="btn btn-primary" onClick={save} disabled={!duration || saving}>
-        {saving ? 'Saving…' : 'Log exercise'}
+        {saving ? 'Saving…' : `Log ${duration ? `${duration}m` : 'exercise'}`}
       </button>
     </div>
   );

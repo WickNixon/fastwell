@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 
+const DEFAULT_GOAL = 8;
 const HOURS_OPTIONS = [5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9];
 const QUALITY_LABELS = ['', 'Poor', 'Restless', 'Okay', 'Good', 'Great'];
 
@@ -18,23 +19,34 @@ export default function TrackSleepPage() {
   const supabase = createClient();
   const router = useRouter();
   const TODAY = getTodayNZ();
+
+  const [goal, setGoal] = useState(DEFAULT_GOAL);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState('');
+  const [customHabitsDb, setCustomHabitsDb] = useState<Record<string, { goal: number; unit: string }>>({});
+
   const [hours, setHours] = useState<number | null>(null);
   const [quality, setQuality] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!profile) return;
-    Promise.all([
-      getSupabase().from('health_entries').select('value')
-        .eq('user_id', profile.id).eq('entry_date', TODAY).eq('metric', 'sleep_hours').eq('source', 'manual').maybeSingle(),
-      getSupabase().from('health_entries').select('value')
-        .eq('user_id', profile.id).eq('entry_date', TODAY).eq('metric', 'sleep_quality').eq('source', 'manual').maybeSingle(),
-    ]).then(([h, q]) => {
-      if (h.data) setHours(h.data.value);
-      if (q.data) setQuality(q.data.value);
-    });
-  }, [profile]);
+    const [{ data: h }, { data: q }, { data: profileData }] = await Promise.all([
+      getSupabase().from('health_entries').select('value').eq('user_id', profile.id).eq('entry_date', TODAY).eq('metric', 'sleep_hours').eq('source', 'manual').maybeSingle(),
+      getSupabase().from('health_entries').select('value').eq('user_id', profile.id).eq('entry_date', TODAY).eq('metric', 'sleep_quality').eq('source', 'manual').maybeSingle(),
+      getSupabase().from('profiles').select('custom_habits').eq('id', profile.id).maybeSingle(),
+    ]);
+    if (h) setHours(h.value);
+    if (q) setQuality(q.value);
+    if (profileData?.custom_habits) {
+      const ch = profileData.custom_habits as Record<string, { goal: number; unit: string }>;
+      setCustomHabitsDb(ch);
+      if (ch.sleep?.goal) setGoal(ch.sleep.goal);
+    }
+  }, [profile, TODAY]);
+
+  useEffect(() => { load(); }, [load]);
 
   const save = async () => {
     if (!user || !hours || saving) return;
@@ -59,11 +71,39 @@ export default function TrackSleepPage() {
     setSaving(false);
   };
 
+  const saveGoal = async (newGoal: number) => {
+    setGoal(newGoal);
+    setEditingGoal(false);
+    if (!user) return;
+    const newDb = { ...customHabitsDb, sleep: { goal: newGoal, unit: 'hours' } };
+    setCustomHabitsDb(newDb);
+    await getSupabase().from('profiles').update({ custom_habits: newDb }).eq('id', user.id);
+  };
+
   return (
     <div className="page page-top">
       <button onClick={() => router.back()} style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Lato, sans-serif' }}>← Back</button>
-      <h1 className="h1 mb-8">Sleep</h1>
-      <p className="body-sm mb-24">How did you sleep last night?</p>
+      <h1 className="h1 mb-0">😴 Sleep</h1>
+
+      {/* Goal row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 24, marginTop: 6 }}>
+        {editingGoal ? (
+          <>
+            <input type="number" className="input" style={{ maxWidth: 80 }} value={goalInput} step={0.5}
+              onChange={e => setGoalInput(e.target.value)} autoFocus />
+            <span style={{ color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', fontSize: 14 }}>hours</span>
+            <button className="btn btn-primary btn-sm" onClick={() => saveGoal(parseFloat(goalInput) || DEFAULT_GOAL)}>Save</button>
+            <button onClick={() => setEditingGoal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 18, lineHeight: 1, padding: 2 }}>✕</button>
+          </>
+        ) : (
+          <>
+            <span style={{ fontSize: 14, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>Goal: {goal} hours</span>
+            <button onClick={() => { setGoalInput(String(goal)); setEditingGoal(true); }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--text-muted)', padding: 2 }}
+              aria-label="Edit goal">✎</button>
+          </>
+        )}
+      </div>
 
       {feedback && (
         <div style={{
