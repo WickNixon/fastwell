@@ -13,6 +13,15 @@ const PROTOCOLS = [
   { key: 'Custom', label: 'Custom', hours: 0 },
 ];
 
+const FAST_KEY = 'fastwell_active_fast';
+
+interface StoredFast {
+  sessionId: string;
+  startedAt: string;
+  protocol: string;
+  goalHours: number;
+}
+
 function getGoalHours(protocol: string, customHrs: number): number {
   const HOURS: Record<string, number> = { '17h': 17, '24h': 24 };
   if (protocol in HOURS) return HOURS[protocol];
@@ -47,20 +56,82 @@ export default function FastingTimerPage() {
 
   // Resume on mount if session exists
   useEffect(() => {
-    if (!profile) return;
-    (async () => {
-      const { data } = await getSupabase()
-        .from('fasting_sessions')
-        .select('*')
-        .eq('user_id', profile.id)
-        .is('ended_at', null)
-        .order('started_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      setActiveFast(data ?? null);
-      if (data) startTick(new Date(data.started_at));
+    if (!profile) {
       setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      // Hard timeout — fall back to localStorage if Supabase is slow
+      if (cancelled) return;
+      try {
+        const stored = localStorage.getItem(FAST_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored) as StoredFast;
+          if (!cancelled) {
+            setActiveFast({ id: parsed.sessionId, user_id: profile.id, started_at: parsed.startedAt, protocol: parsed.protocol, ended_at: null, duration_minutes: null, notes: null, created_at: parsed.startedAt });
+            startTick(new Date(parsed.startedAt));
+          }
+        }
+      } catch {}
+      if (!cancelled) setLoading(false);
+    }, 5000);
+
+    (async () => {
+      try {
+        const { data } = await getSupabase()
+          .from('fasting_sessions')
+          .select('*')
+          .eq('user_id', profile.id)
+          .is('ended_at', null)
+          .order('started_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        clearTimeout(timer);
+        if (cancelled) return;
+        if (data) {
+          // Sync to localStorage so we have a fresh fallback
+          try {
+            localStorage.setItem(FAST_KEY, JSON.stringify({
+              sessionId: data.id,
+              startedAt: data.started_at,
+              protocol: data.protocol,
+              goalHours: getGoalHours(data.protocol ?? '17h', 17),
+            } satisfies StoredFast));
+          } catch {}
+          setActiveFast(data);
+          startTick(new Date(data.started_at));
+        } else {
+          // No open session in Supabase — try localStorage fallback
+          try {
+            const stored = localStorage.getItem(FAST_KEY);
+            if (stored) {
+              const parsed = JSON.parse(stored) as StoredFast;
+              setActiveFast({ id: parsed.sessionId, user_id: profile.id, started_at: parsed.startedAt, protocol: parsed.protocol, ended_at: null, duration_minutes: null, notes: null, created_at: parsed.startedAt });
+              startTick(new Date(parsed.startedAt));
+            }
+          } catch {}
+        }
+      } catch {
+        clearTimeout(timer);
+        if (cancelled) return;
+        // Supabase failed — use localStorage
+        try {
+          const stored = localStorage.getItem(FAST_KEY);
+          if (stored) {
+            const parsed = JSON.parse(stored) as StoredFast;
+            setActiveFast({ id: parsed.sessionId, user_id: profile.id, started_at: parsed.startedAt, protocol: parsed.protocol, ended_at: null, duration_minutes: null, notes: null, created_at: parsed.startedAt });
+            startTick(new Date(parsed.startedAt));
+          }
+        } catch {}
+      }
+      if (!cancelled) setLoading(false);
     })();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [profile, startTick]);
 
   const startFast = async () => {
@@ -82,6 +153,14 @@ export default function FastingTimerPage() {
     if (data) {
       setActiveFast(data as FastingSession);
       startTick(new Date(data.started_at));
+      try {
+        localStorage.setItem(FAST_KEY, JSON.stringify({
+          sessionId: data.id,
+          startedAt: data.started_at,
+          protocol: data.protocol,
+          goalHours: getGoalHours(data.protocol ?? protocolToStore, customHours),
+        } satisfies StoredFast));
+      } catch {}
     }
     setStarting(false);
   };
@@ -96,8 +175,11 @@ export default function FastingTimerPage() {
       .eq('id', activeFast.id);
     if (err) {
       setError(err.message);
+      // Restart the tick so timer keeps running while showing error
+      startTick(new Date(activeFast.started_at));
       return;
     }
+    try { localStorage.removeItem(FAST_KEY); } catch {}
     setActiveFast(null);
     setElapsed(0);
     // Check for new badge, then show gratification sheet

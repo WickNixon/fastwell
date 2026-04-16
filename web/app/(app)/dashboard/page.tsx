@@ -40,6 +40,7 @@ const HABIT_LIBRARY: HabitDef[] = [
 ];
 
 const MEMO_EMOJIS = ['😩', '😕', '😐', '🙂', '😄'];
+const FAST_KEY = 'fastwell_active_fast';
 const PROTOCOLS = ['17h', '24h', 'Custom'];
 const PROTOCOL_HOURS: Record<string, number> = { '17h': 17, '24h': 24 };
 function getGoalHours(protocol: string, customHrs: number): number {
@@ -624,9 +625,38 @@ export default function DashboardPage() {
       const { data: fast } = await sb
         .from('fasting_sessions').select('*').eq('user_id', profile.id)
         .is('ended_at', null).order('started_at', { ascending: false }).limit(1).maybeSingle();
-      setActiveFast(fast ?? null);
-      if (fast) startTick(new Date(fast.started_at));
-    } catch {}
+      if (fast) {
+        setActiveFast(fast);
+        startTick(new Date(fast.started_at));
+        // Keep localStorage in sync as a fallback
+        try {
+          localStorage.setItem(FAST_KEY, JSON.stringify({
+            sessionId: fast.id, startedAt: fast.started_at,
+            protocol: fast.protocol, goalHours: getGoalHours(fast.protocol ?? '17h', 17),
+          }));
+        } catch {}
+      } else {
+        // No open session — try localStorage fallback
+        try {
+          const stored = localStorage.getItem(FAST_KEY);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            setActiveFast({ id: parsed.sessionId, user_id: profile.id, started_at: parsed.startedAt, protocol: parsed.protocol, ended_at: null, duration_minutes: null, notes: null, created_at: parsed.startedAt } as FastingSession);
+            startTick(new Date(parsed.startedAt));
+          }
+        } catch {}
+      }
+    } catch {
+      // Supabase failed — try localStorage
+      try {
+        const stored = localStorage.getItem(FAST_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setActiveFast({ id: parsed.sessionId, user_id: profile.id, started_at: parsed.startedAt, protocol: parsed.protocol, ended_at: null, duration_minutes: null, notes: null, created_at: parsed.startedAt } as FastingSession);
+          startTick(new Date(parsed.startedAt));
+        }
+      } catch {}
+    }
 
     try {
       // Today's health entries
@@ -662,13 +692,22 @@ export default function DashboardPage() {
     fastCompleteTriggeredRef.current = false;
     const protocolToStore = selectedProtocol === 'Custom' ? `${customHours}h` : selectedProtocol;
     try {
-      const { data } = await supabase
+      const { data, error: err } = await supabase
         .from('fasting_sessions')
         .insert({ user_id: user.id, protocol: protocolToStore, started_at: new Date().toISOString() })
         .select().single();
+      if (err) throw err;
       if (data) {
         setActiveFast(data as FastingSession);
         startTick(new Date(data.started_at));
+        try {
+          localStorage.setItem(FAST_KEY, JSON.stringify({
+            sessionId: data.id,
+            startedAt: data.started_at,
+            protocol: data.protocol,
+            goalHours: getGoalHours(protocolToStore, customHours),
+          }));
+        } catch {}
       }
     } catch {}
     setStarting(false);
@@ -685,12 +724,17 @@ export default function DashboardPage() {
     if (!activeFast) return;
     setConfirmEnd(false);
     if (intervalRef.current) clearInterval(intervalRef.current);
-    await getSupabase().from('fasting_sessions')
+    const { error: err } = await getSupabase().from('fasting_sessions')
       .update({ ended_at: new Date().toISOString(), duration_minutes: Math.floor(elapsed / 60) })
       .eq('id', activeFast.id);
+    if (err) {
+      // Restart tick and stay on page if update fails
+      startTick(new Date(activeFast.started_at));
+      return;
+    }
+    try { localStorage.removeItem(FAST_KEY); } catch {}
     setActiveFast(null);
     setElapsed(0);
-    router.push('/dashboard');
   };
 
   const handleTick = async (habit: HabitDef) => {
