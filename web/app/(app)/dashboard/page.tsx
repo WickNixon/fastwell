@@ -485,13 +485,15 @@ function GoalEditModal({
 // ─── Gratification Sheet ─────────────────────────────────────────────────────
 
 function GratificationSheet({
-  reason, badge, onCollect, onViewMilestones,
+  reason, badge, firstName, onCollect, onViewMilestones,
 }: {
   reason: 'fast' | 'habits';
   badge: UserBadge | null;
+  firstName?: string | null;
   onCollect: () => void;
   onViewMilestones: () => void;
 }) {
+  const name = firstName ? `, ${firstName}` : '';
   return (
     <div className="modal-overlay">
       <div className="modal-sheet">
@@ -500,12 +502,12 @@ function GratificationSheet({
           {reason === 'fast' ? '🌿' : '⭐'}
         </p>
         <p style={{ textAlign: 'center', fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 22, marginBottom: 8, color: 'var(--text)' }}>
-          {reason === 'fast' ? 'Fast complete.' : 'All habits done today.'}
+          {reason === 'fast' ? 'Fast complete.' : `All done today${name}.`}
         </p>
         <p style={{ textAlign: 'center', fontFamily: 'Lato, sans-serif', fontSize: 16, color: 'var(--text-muted)', marginBottom: 24, lineHeight: 1.5 }}>
           {reason === 'fast'
-            ? 'Your body worked hard today. Every hour counts.'
-            : 'Consistency is everything. You showed up for yourself today.'}
+            ? `Your body worked hard today${name}. That matters.`
+            : 'Every habit ticked. That\'s what consistency looks like.'}
         </p>
         {badge && (
           <div style={{
@@ -789,6 +791,8 @@ export default function DashboardPage() {
     try { localStorage.removeItem(FAST_KEY); } catch {}
     setActiveFast(null);
     setElapsed(0);
+    // Show gratification sheet after manual fast end
+    checkBadge().then(badge => setGratification({ reason: 'fast', badge }));
   };
 
   const handleTick = async (habit: HabitDef) => {
@@ -994,6 +998,7 @@ export default function DashboardPage() {
         <GratificationSheet
           reason={gratification.reason}
           badge={gratification.badge}
+          firstName={profile?.first_name}
           onCollect={collectBadge}
           onViewMilestones={() => { setGratification(null); router.push('/rewards'); }}
         />

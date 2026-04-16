@@ -297,7 +297,7 @@ export default function FastingTimerPage() {
                 Fast complete.
               </p>
               <p style={{ textAlign: 'center', fontFamily: 'Lato, sans-serif', fontSize: 16, color: 'var(--text-muted)', marginBottom: 24, lineHeight: 1.5 }}>
-                Your body worked hard today. Every hour counts.
+                Your body worked hard today{profile?.first_name ? `, ${profile.first_name}` : ''}. That matters.
               </p>
               {gratification.badge && (
                 <div style={{
