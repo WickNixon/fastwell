@@ -31,7 +31,6 @@ const HABIT_LIBRARY: HabitDef[] = [
   { key: 'meditation', label: 'Meditation', icon: '🧘', href: '/track', goal: '10 mins' },
   { key: 'reading', label: 'Read a book', icon: '📚', href: '/track', goal: '20 mins' },
   { key: 'caffeine', label: 'Caffeine intake', icon: '☕', href: '/track', goal: 'Daily log' },
-  { key: 'alcohol', label: 'Alcohol intake', icon: '🍷', href: '/track', goal: 'Daily log' },
   { key: 'veggies', label: 'Eat fruits & veggies', icon: '🥦', href: '/track', goal: 'Daily tick' },
   { key: 'review', label: 'Review your day', icon: '🌙', href: '/track', goal: 'Daily tick' },
   { key: 'mood', label: 'Mood check', icon: '😊', href: '/track/mood', goal: 'Daily' },
@@ -569,7 +568,10 @@ export default function DashboardPage() {
   useEffect(() => {
     try {
       const stored = localStorage.getItem('fastwell_custom_habits');
-      if (stored) setCustomHabits(JSON.parse(stored));
+      if (stored) {
+        const parsed = JSON.parse(stored) as HabitDef[];
+        setCustomHabits(parsed.filter(h => h.key !== 'alcohol'));
+      }
       const storedGoals = localStorage.getItem('fastwell_habit_goals');
       if (storedGoals) setCustomGoals(JSON.parse(storedGoals));
     } catch {}
