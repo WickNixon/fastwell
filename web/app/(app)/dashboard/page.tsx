@@ -41,6 +41,30 @@ const HABIT_LIBRARY: HabitDef[] = [
 
 const MEMO_EMOJIS = ['😩', '😕', '😐', '🙂', '😄'];
 const FAST_KEY = 'fastwell_active_fast';
+
+// Maps tracking-page metric names → dashboard habit keys (for progress fill)
+const METRIC_TO_HABIT: Record<string, string> = {
+  'water_ml': 'water',
+  'exercise_minutes': 'exercise',
+  'sleep_hours': 'sleep',
+  'steps': 'walking',
+  'meditation': 'meditation',
+  'reading': 'reading',
+};
+
+const HABIT_UNITS: Record<string, string> = {
+  water: 'ml', exercise: 'mins', sleep: 'hours', walking: 'steps',
+  meditation: 'mins', reading: 'mins',
+};
+
+function goalToNumber(goal: string | undefined, habitKey: string): number {
+  const defaults: Record<string, number> = {
+    water: 2000, exercise: 30, sleep: 8, walking: 10000, meditation: 10, reading: 20,
+  };
+  if (!goal) return defaults[habitKey] ?? 0;
+  const match = goal.replace(/,/g, '').match(/[\d]+(?:\.\d+)?/);
+  return match ? parseFloat(match[0]) : (defaults[habitKey] ?? 0);
+}
 const PROTOCOLS = ['17h', '24h', 'Custom'];
 const PROTOCOL_HOURS: Record<string, number> = { '17h': 17, '24h': 24 };
 function getGoalHours(protocol: string, customHrs: number): number {
@@ -248,21 +272,23 @@ function FastingCard({
 // ─── Habit Card ───────────────────────────────────────────────────────────────
 
 function HabitCard({
-  habit, done, customGoal, memoEmoji, onTick, onCardTap, onEdit,
+  habit, done, customGoal, memoEmoji, progress, onTick, onCardTap, onEdit,
 }: {
   habit: HabitDef;
   done: boolean;
   customGoal: string | undefined;
   memoEmoji?: { emoji: string | null; memo: string | null };
+  progress: number; // 0–100
   onTick: () => void;
   onCardTap: () => void;
   onEdit: () => void;
 }) {
+  const effectiveDone = done || progress >= 100;
   return (
     <div
       style={{
         position: 'relative', overflow: 'hidden',
-        border: `1px solid ${done ? 'var(--primary)' : 'var(--border)'}`,
+        border: `1px solid ${effectiveDone ? 'var(--primary)' : 'var(--border)'}`,
         borderRadius: 14, padding: '14px 16px', marginBottom: 10,
         display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer',
         backgroundColor: 'var(--surface)',
@@ -275,15 +301,15 @@ function HabitCard({
       {/* Progress fill layer */}
       <div style={{
         position: 'absolute', top: 0, left: 0, height: '100%',
-        width: done ? '100%' : '0%',
+        width: `${progress}%`,
         backgroundColor: '#EAF3DC',
-        transition: 'width 0.5s ease',
+        transition: 'width 0.4s ease',
         zIndex: 0,
       }} />
       {/* Content */}
       <span style={{ fontSize: 26, flexShrink: 0, position: 'relative', zIndex: 1 }}>{habit.icon}</span>
       <div style={{ flex: 1, minWidth: 0, position: 'relative', zIndex: 1 }}>
-        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14, color: done ? 'var(--primary)' : 'var(--text)', marginBottom: 2 }}>
+        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14, color: effectiveDone ? 'var(--primary)' : 'var(--text)', marginBottom: 2 }}>
           {habit.label}{memoEmoji?.emoji ? <span style={{ marginLeft: 6, fontSize: 14 }}>{memoEmoji.emoji}</span> : null}
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -303,13 +329,13 @@ function HabitCard({
         onClick={e => { e.stopPropagation(); onTick(); }}
         style={{
           width: 36, height: 36, borderRadius: '50%', border: 'none',
-          backgroundColor: done ? 'var(--primary)' : 'var(--border)',
-          color: done ? '#FFFFFF' : 'var(--text-muted)',
+          backgroundColor: effectiveDone ? 'var(--primary)' : 'var(--border)',
+          color: effectiveDone ? '#FFFFFF' : 'var(--text-muted)',
           fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 16,
           cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
           position: 'relative', zIndex: 1,
         }}
-        aria-label={done ? `${habit.label} done` : `Complete ${habit.label}`}
+        aria-label={effectiveDone ? `${habit.label} done` : `Complete ${habit.label}`}
       >
         ✓
       </button>
@@ -540,6 +566,7 @@ export default function DashboardPage() {
   const [customGoals, setCustomGoals] = useState<Record<string, string>>({});
   const [todayEntries, setTodayEntries] = useState<Set<string>>(new Set());
   const [todayMemos, setTodayMemos] = useState<Record<string, { emoji: string | null; memo: string | null }>>({});
+  const [todayValues, setTodayValues] = useState<Record<string, number>>({});
   const [bottomSheet, setBottomSheet] = useState<HabitDef | null>(null);
   const [addModal, setAddModal] = useState(false);
   const [goalEditHabit, setGoalEditHabit] = useState<HabitDef | null>(null);
@@ -661,15 +688,19 @@ export default function DashboardPage() {
     }
 
     try {
-      // Today's health entries — include memo/emoji for habit cards
+      // Today's health entries — metric, value, memo, emoji for cards and progress fill
       const { data: entries } = await sb
-        .from('health_entries').select('metric, memo, emoji').eq('user_id', profile.id).eq('entry_date', today);
+        .from('health_entries').select('metric, value, memo, emoji').eq('user_id', profile.id).eq('entry_date', today);
       setTodayEntries(new Set((entries ?? []).map((e: { metric: string }) => e.metric)));
       const memos: Record<string, { emoji: string | null; memo: string | null }> = {};
+      const values: Record<string, number> = {};
       for (const e of (entries ?? [])) {
         if (e.emoji || e.memo) memos[e.metric] = { emoji: e.emoji ?? null, memo: e.memo ?? null };
+        const habitKey = METRIC_TO_HABIT[e.metric];
+        if (habitKey) values[habitKey] = (values[habitKey] ?? 0) + (e.value ?? 0);
       }
       setTodayMemos(memos);
+      setTodayValues(values);
     } catch {}
 
     try {
@@ -862,18 +893,26 @@ export default function DashboardPage() {
             {habitError}
           </div>
         )}
-        {allHabits.map(habit => (
+        {allHabits.map(habit => {
+          const done = todayEntries.has(habit.key);
+          const goalStr = customGoals[habit.key] ?? habit.goal;
+          const goalNum = goalToNumber(goalStr, habit.key);
+          const actualValue = todayValues[habit.key] ?? 0;
+          const progress = done ? 100 : (goalNum > 0 ? Math.min((actualValue / goalNum) * 100, 100) : 0);
+          return (
           <HabitCard
             key={habit.key}
             habit={habit}
-            done={todayEntries.has(habit.key)}
-            customGoal={customGoals[habit.key]}
+            done={done}
+            customGoal={goalStr}
             memoEmoji={todayMemos[habit.key]}
+            progress={progress}
             onTick={() => handleTick(habit)}
             onCardTap={() => router.push(habit.href)}
             onEdit={() => setGoalEditHabit(habit)}
           />
-        ))}
+          );
+        })}
 
         <button
           onClick={() => setAddModal(true)}
