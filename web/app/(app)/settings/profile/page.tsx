@@ -47,6 +47,7 @@ export default function SettingsProfilePage() {
   const [weightUnit, setWeightUnit] = useState('kg');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     if (profile) {
@@ -63,7 +64,8 @@ export default function SettingsProfilePage() {
   const save = async () => {
     if (!profile) return;
     setSaving(true);
-    await supabase.from('profiles').update({
+    setSaveError('');
+    const { error } = await supabase.from('profiles').update({
       first_name: firstName || null,
       age: age ? parseInt(age) : null,
       menopause_stage: stage || null,
@@ -72,10 +74,14 @@ export default function SettingsProfilePage() {
       primary_goal: goal || null,
       weight_unit: weightUnit,
     }).eq('id', profile.id);
-    await refreshProfile();
-    setSaved(true);
+    if (error) {
+      setSaveError(error.message);
+    } else {
+      await refreshProfile();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
     setSaving(false);
-    setTimeout(() => setSaved(false), 2000);
   };
 
   const isPostMeno = stage === 'post_menopause';
@@ -89,6 +95,11 @@ export default function SettingsProfilePage() {
       {saved && (
         <div style={{ background: 'var(--primary-pale)', border: '1px solid var(--border)', color: 'var(--primary)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 14, fontFamily: 'Lato, sans-serif' }}>
           ✓ Changes saved
+        </div>
+      )}
+      {saveError && (
+        <div style={{ background: '#FFF3F3', border: '1px solid #FFCDD2', color: '#C62828', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 14, fontFamily: 'Lato, sans-serif' }}>
+          {saveError}
         </div>
       )}
 
