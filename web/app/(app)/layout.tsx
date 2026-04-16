@@ -58,7 +58,6 @@ const NAV = [
   { href: '/fasting', label: 'Fast', Icon: FastIcon },
   { href: '/track', label: 'Track', Icon: TrackIcon },
   { href: '/results', label: 'Me', Icon: MeIcon },
-  { href: '/settings', label: 'Settings', Icon: SettingsIcon },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
