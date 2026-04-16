@@ -6,33 +6,165 @@ import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { FastingSession } from '@/lib/types';
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function isoDate(d: Date) { return d.toISOString().split('T')[0]; }
+
 function calcLongestStreak(dates: string[]): number {
   if (!dates.length) return 0;
   const sorted = [...new Set(dates)].sort();
-  let longest = 1;
-  let current = 1;
+  let longest = 1; let current = 1;
   for (let i = 1; i < sorted.length; i++) {
-    const prev = new Date(sorted[i - 1]);
-    const curr = new Date(sorted[i]);
-    const diff = (curr.getTime() - prev.getTime()) / 86400000;
-    if (diff === 1) {
-      current++;
-      longest = Math.max(longest, current);
-    } else {
-      current = 1;
-    }
+    const diff = (new Date(sorted[i]).getTime() - new Date(sorted[i - 1]).getTime()) / 86400000;
+    if (diff === 1) { current++; longest = Math.max(longest, current); }
+    else { current = 1; }
   }
   return longest;
 }
 
+// ─── Habit colour palette ─────────────────────────────────────────────────────
+
+const HABIT_COLOURS: Record<string, string> = {
+  fasting:    '#5C8A34',
+  exercise:   '#D06820',
+  sleep:      '#6B9B4A',
+  water:      '#4A90D9',
+  walking:    '#9B6B4A',
+  meditation: '#9B4AD9',
+  reading:    '#4AD9C4',
+  veggies:    '#D9C44A',
+  review:     '#D94A6B',
+  mood:       '#C44AD9',
+  energy:     '#4AD96B',
+  symptoms:   '#D9874A',
+  weight:     '#4A6BD9',
+};
+const FALLBACK_COLOURS = ['#A0A0A0', '#B05050', '#50B0A0', '#A0B050', '#5050B0'];
+
+function habitColour(key: string, idx: number): string {
+  return HABIT_COLOURS[key] ?? FALLBACK_COLOURS[idx % FALLBACK_COLOURS.length];
+}
+
+// ─── Calendar Component ───────────────────────────────────────────────────────
+
+interface DayEntry { metric: string }
+
+function HabitCalendar({
+  dayData,
+  startDate,
+  numDays,
+  onDayTap,
+  selectedDay,
+}: {
+  dayData: Record<string, DayEntry[]>;
+  startDate: Date;
+  numDays: number;
+  onDayTap: (dateStr: string) => void;
+  selectedDay: string | null;
+}) {
+  const days = Array.from({ length: numDays }, (_, i) => {
+    const d = new Date(startDate);
+    d.setDate(startDate.getDate() + i);
+    return d;
+  });
+  const today = isoDate(new Date());
+  const DAY_ABBRS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+  const weeks: Date[][] = [];
+  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+
+  return (
+    <div>
+      {weeks.map((week, wi) => (
+        <div key={wi} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 8 }}>
+          {week.map(d => {
+            const str = isoDate(d);
+            const isToday = str === today;
+            const isSelected = str === selectedDay;
+            const entries = dayData[str] ?? [];
+            return (
+              <div
+                key={str}
+                onClick={() => onDayTap(str)}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer' }}
+              >
+                {wi === 0 && (
+                  <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 10, color: '#7A9A6A' }}>
+                    {DAY_ABBRS[d.getDay()]}
+                  </span>
+                )}
+                <div style={{
+                  width: 32, height: 32, borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: isSelected ? 'var(--primary)' : isToday ? 'var(--primary-pale)' : 'transparent',
+                  border: isToday && !isSelected ? '1.5px solid var(--primary)' : isSelected ? 'none' : '1px solid var(--border)',
+                }}>
+                  <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 12, color: isSelected ? '#fff' : isToday ? 'var(--primary)' : 'var(--text-muted)' }}>
+                    {d.getDate()}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', minHeight: 8 }}>
+                  {entries.slice(0, 5).map((e, i) => (
+                    <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: habitColour(e.metric, i) }} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Day Summary Panel ────────────────────────────────────────────────────────
+
+function DaySummary({ dateStr, entries }: { dateStr: string; entries: DayEntry[] }) {
+  const date = new Date(dateStr);
+  const label = date.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' });
+  return (
+    <div style={{
+      backgroundColor: 'var(--surface)', border: '1px solid var(--border)',
+      borderRadius: 12, padding: '14px 16px', marginTop: 12,
+    }}>
+      <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 14, marginBottom: 10, color: 'var(--text)' }}>
+        {label}
+      </p>
+      {entries.length === 0 ? (
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>Nothing logged this day.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {entries.map((e, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, backgroundColor: habitColour(e.metric, i) }} />
+              <p style={{ fontSize: 13, fontFamily: 'Lato, sans-serif', color: 'var(--text)', textTransform: 'capitalize' }}>
+                {e.metric.replace(/_/g, ' ')}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Me Page ─────────────────────────────────────────────────────────────
+
 export default function MePage() {
   const { profile, loading: authLoading } = useAuth();
   const router = useRouter();
+
+  // All-time stats
   const [totalFasts, setTotalFasts] = useState<number | null>(null);
   const [badgeCount, setBadgeCount] = useState<number | null>(null);
   const [streak, setStreak] = useState<number | null>(null);
 
-  // Results data (period filtered)
+  // Calendar data
+  const [dayData, setDayData] = useState<Record<string, DayEntry[]>>({});
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [showAllCalendar, setShowAllCalendar] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
+
+  // Period results
   const [period, setPeriod] = useState<'7d' | '30d' | '3m' | '6m' | '12m'>('30d');
   const [fasts, setFasts] = useState<FastingSession[]>([]);
   const [loading, setLoading] = useState(false);
@@ -57,6 +189,34 @@ export default function MePage() {
       setTotalFasts(fastsCount ?? 0);
       setBadgeCount(badges ?? 0);
       setStreak(calcLongestStreak((entryDates ?? []).map((e: { entry_date: string }) => e.entry_date)));
+    } catch {}
+  }, [profile]);
+
+  const loadCalendar = useCallback(async () => {
+    if (!profile) return;
+    const sb = getSupabase();
+    try {
+      const past = new Date(); past.setDate(past.getDate() - 60);
+      const [{ data: entries }, { data: fastingDays }] = await Promise.all([
+        sb.from('health_entries').select('entry_date,metric')
+          .eq('user_id', profile.id).gte('entry_date', isoDate(past)),
+        sb.from('fasting_sessions').select('started_at')
+          .eq('user_id', profile.id).not('ended_at', 'is', null)
+          .gte('started_at', past.toISOString()),
+      ]);
+      const map: Record<string, DayEntry[]> = {};
+      (entries ?? []).forEach((e: { entry_date: string; metric: string }) => {
+        if (!map[e.entry_date]) map[e.entry_date] = [];
+        if (!map[e.entry_date].find(x => x.metric === e.metric)) {
+          map[e.entry_date].push({ metric: e.metric });
+        }
+      });
+      (fastingDays ?? []).forEach((f: { started_at: string }) => {
+        const d = isoDate(new Date(f.started_at));
+        if (!map[d]) map[d] = [];
+        if (!map[d].find(x => x.metric === 'fasting')) map[d].push({ metric: 'fasting' });
+      });
+      setDayData(map);
     } catch {}
   }, [profile]);
 
@@ -91,22 +251,26 @@ export default function MePage() {
   useEffect(() => {
     if (authLoading) return;
     loadStats();
+    loadCalendar();
     loadPeriod();
-  }, [authLoading, loadStats, loadPeriod]);
+  }, [authLoading, loadStats, loadCalendar, loadPeriod]);
 
   useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
 
-  const initials = profile?.first_name
-    ? profile.first_name.slice(0, 2).toUpperCase()
-    : '??';
-
+  const initials = profile?.first_name ? profile.first_name.slice(0, 2).toUpperCase() : '??';
   const tierLabel = profile?.subscription_tier === 'member' ? 'Member' : 'Subscriber';
   const tierColor = profile?.subscription_tier === 'member' ? '#5C8A34' : '#D06820';
-
   const fastCount = fasts.length;
   const avgFastHours = fastCount
     ? Math.floor(fasts.reduce((s, f) => s + (f.duration_minutes ?? 0), 0) / fastCount / 60)
     : null;
+
+  // 14-day calendar window
+  const twoWeeksAgo = new Date(); twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 13);
+
+  // Full month calendar window
+  const monthStart = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
+  const daysInMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate();
 
   return (
     <div className="page page-top">
@@ -125,7 +289,7 @@ export default function MePage() {
       </div>
 
       {/* Profile header */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 28 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 24 }}>
         <div style={{
           width: 72, height: 72, borderRadius: '50%', backgroundColor: 'var(--primary)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12,
@@ -160,19 +324,36 @@ export default function MePage() {
             <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 24, color: 'var(--primary)', lineHeight: 1 }}>
               {value ?? '—'}
             </p>
-            <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-              {label}
-            </p>
+            <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{label}</p>
           </div>
         ))}
       </div>
 
-      {/* Period filter */}
+      {/* 2-week habit calendar */}
+      <div className="section">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <p className="section-label">Last 2 weeks</p>
+          <button
+            onClick={() => setShowAllCalendar(true)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13 }}
+          >
+            See all →
+          </button>
+        </div>
+        <HabitCalendar
+          dayData={dayData}
+          startDate={twoWeeksAgo}
+          numDays={14}
+          onDayTap={d => setSelectedDay(selectedDay === d ? null : d)}
+          selectedDay={selectedDay}
+        />
+        {selectedDay && <DaySummary dateStr={selectedDay} entries={dayData[selectedDay] ?? []} />}
+      </div>
+
+      {/* Period filter + results */}
       <div className="filter-tabs mb-20">
         {(['7d', '30d', '3m', '6m', '12m'] as const).map(p => (
-          <button key={p} className={`filter-tab ${period === p ? 'active' : ''}`} onClick={() => setPeriod(p)}>
-            {p}
-          </button>
+          <button key={p} className={`filter-tab ${period === p ? 'active' : ''}`} onClick={() => setPeriod(p)}>{p}</button>
         ))}
       </div>
 
@@ -216,10 +397,41 @@ export default function MePage() {
             <div className="empty-state mt-20">
               <div className="empty-state-icon">🌱</div>
               <p className="h3">Nothing here yet</p>
-              <p className="body-sm">As you start logging, your progress will show up here — ready to share with your GP or just to see how far you've come.</p>
+              <p className="body-sm">As you start logging, your progress will show up here.</p>
             </div>
           )}
         </>
+      )}
+
+      {/* See All calendar modal */}
+      {showAllCalendar && (
+        <div className="modal-overlay">
+          <div className="modal-sheet" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="modal-handle" />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <button
+                onClick={() => setCalendarMonth(m => { const n = new Date(m); n.setMonth(n.getMonth() - 1); return n; })}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--text-muted)', padding: 4 }}
+              >‹</button>
+              <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>
+                {calendarMonth.toLocaleDateString('en-NZ', { month: 'long', year: 'numeric' })}
+              </p>
+              <button
+                onClick={() => setCalendarMonth(m => { const n = new Date(m); n.setMonth(n.getMonth() + 1); return n; })}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--text-muted)', padding: 4 }}
+              >›</button>
+            </div>
+            <HabitCalendar
+              dayData={dayData}
+              startDate={monthStart}
+              numDays={daysInMonth}
+              onDayTap={d => setSelectedDay(selectedDay === d ? null : d)}
+              selectedDay={selectedDay}
+            />
+            {selectedDay && <DaySummary dateStr={selectedDay} entries={dayData[selectedDay] ?? []} />}
+            <button className="btn btn-ghost mt-16" onClick={() => setShowAllCalendar(false)}>Close</button>
+          </div>
+        </div>
       )}
     </div>
   );
