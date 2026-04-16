@@ -9,6 +9,7 @@ export default function ChangePasswordPage() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -57,7 +58,8 @@ export default function ChangePasswordPage() {
         <div className="input-group">
           <label className="input-label">Confirm new password</label>
           <div className="input-wrapper">
-            <input className="input" type={showPass ? 'text' : 'password'} placeholder="Repeat your password" value={confirm} onChange={e => setConfirm(e.target.value)} required />
+            <input className="input" type={showConfirm ? 'text' : 'password'} placeholder="Repeat your password" value={confirm} onChange={e => setConfirm(e.target.value)} required />
+            <button type="button" className="eye-toggle" onClick={() => setShowConfirm(!showConfirm)}>{showConfirm ? '🙈' : '👁'}</button>
           </div>
           {confirm && confirm !== password && <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>Passwords don't match</p>}
         </div>
