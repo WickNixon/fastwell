@@ -246,33 +246,55 @@ function FastingCard({
 // ─── Habit Card ───────────────────────────────────────────────────────────────
 
 function HabitCard({
-  habit, done, progress, onTick, onCardTap,
+  habit, done, customGoal, onTick, onCardTap, onEdit,
 }: {
   habit: HabitDef;
   done: boolean;
-  progress: string;
+  customGoal: string | undefined;
   onTick: () => void;
   onCardTap: () => void;
+  onEdit: () => void;
 }) {
   return (
     <div
       style={{
-        backgroundColor: done ? 'var(--primary-pale)' : 'var(--surface)',
+        position: 'relative', overflow: 'hidden',
         border: `1px solid ${done ? 'var(--primary)' : 'var(--border)'}`,
         borderRadius: 14, padding: '14px 16px', marginBottom: 10,
         display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer',
+        backgroundColor: 'var(--surface)',
       }}
       onClick={onCardTap}
       role="button"
       tabIndex={0}
       onKeyDown={e => e.key === 'Enter' && onCardTap()}
     >
-      <span style={{ fontSize: 26, flexShrink: 0 }}>{habit.icon}</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      {/* Progress fill layer */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, height: '100%',
+        width: done ? '100%' : '0%',
+        backgroundColor: '#EAF3DC',
+        transition: 'width 0.5s ease',
+        zIndex: 0,
+      }} />
+      {/* Content */}
+      <span style={{ fontSize: 26, flexShrink: 0, position: 'relative', zIndex: 1 }}>{habit.icon}</span>
+      <div style={{ flex: 1, minWidth: 0, position: 'relative', zIndex: 1 }}>
         <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14, color: done ? 'var(--primary)' : 'var(--text)', marginBottom: 2 }}>
           {habit.label}
         </p>
-        <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>{progress}</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>
+            {customGoal ?? habit.goal ?? ''}
+          </p>
+          <button
+            onClick={e => { e.stopPropagation(); onEdit(); }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--text-muted)', fontSize: 11, lineHeight: 1, flexShrink: 0 }}
+            aria-label="Edit goal"
+          >
+            ✎
+          </button>
+        </div>
       </div>
       <button
         onClick={e => { e.stopPropagation(); onTick(); }}
@@ -282,6 +304,7 @@ function HabitCard({
           color: done ? '#FFFFFF' : 'var(--text-muted)',
           fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 16,
           cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          position: 'relative', zIndex: 1,
         }}
         aria-label={done ? `${habit.label} done` : `Complete ${habit.label}`}
       >
@@ -388,6 +411,48 @@ function AddHabitModal({
   );
 }
 
+// ─── Goal Edit Modal ─────────────────────────────────────────────────────────
+
+function GoalEditModal({
+  habit, currentGoal, onSave, onClose,
+}: {
+  habit: HabitDef;
+  currentGoal: string;
+  onSave: (goal: string) => void;
+  onClose: () => void;
+}) {
+  const [value, setValue] = useState(currentGoal);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+        <div className="modal-handle" />
+        <p style={{ textAlign: 'center', fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 16, marginBottom: 4 }}>
+          {habit.icon} {habit.label}
+        </p>
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, fontFamily: 'Lato, sans-serif', marginBottom: 20 }}>
+          Set your daily goal
+        </p>
+        <div className="input-group">
+          <label className="input-label">Goal</label>
+          <input
+            className="input"
+            type="text"
+            value={value}
+            onChange={e => setValue(e.target.value)}
+            placeholder={habit.goal ?? 'e.g. 30 mins'}
+            autoFocus
+          />
+        </div>
+        <button className="btn btn-primary" onClick={() => { onSave(value); onClose(); }} disabled={!value.trim()}>
+          Save goal
+        </button>
+        <button className="btn btn-ghost mt-12" onClick={onClose}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Gratification Sheet ─────────────────────────────────────────────────────
 
 function GratificationSheet({
@@ -469,9 +534,11 @@ export default function DashboardPage() {
 
   // Habit state
   const [customHabits, setCustomHabits] = useState<HabitDef[]>([]);
+  const [customGoals, setCustomGoals] = useState<Record<string, string>>({});
   const [todayEntries, setTodayEntries] = useState<Set<string>>(new Set());
   const [bottomSheet, setBottomSheet] = useState<HabitDef | null>(null);
   const [addModal, setAddModal] = useState(false);
+  const [goalEditHabit, setGoalEditHabit] = useState<HabitDef | null>(null);
 
   // Insights
   const [insights, setInsights] = useState<{ id: string; insight_text: string }[]>([]);
@@ -498,11 +565,13 @@ export default function DashboardPage() {
     } catch { return null; }
   };
 
-  // Load custom habits from localStorage
+  // Load custom habits + goals from localStorage
   useEffect(() => {
     try {
       const stored = localStorage.getItem('fastwell_custom_habits');
       if (stored) setCustomHabits(JSON.parse(stored));
+      const storedGoals = localStorage.getItem('fastwell_habit_goals');
+      if (storedGoals) setCustomGoals(JSON.parse(storedGoals));
     } catch {}
   }, []);
 
@@ -617,26 +686,42 @@ export default function DashboardPage() {
     router.push('/fasting/timer');
   };
 
-  const handleTick = (habit: HabitDef) => {
-    if (todayEntries.has(habit.key)) return; // already done
+  const handleTick = async (habit: HabitDef) => {
+    if (todayEntries.has(habit.key) || !user) return;
+    // Optimistic update immediately
+    setTodayEntries(prev => new Set([...prev, habit.key]));
+    setCompletedDates(prev => new Set([...prev, today]));
+    // Save to Supabase immediately — don't wait for memo
+    await supabase.from('health_entries').upsert({
+      user_id: user.id,
+      entry_date: today,
+      metric: habit.key,
+      value: 1,
+      unit: 'check',
+      source: 'manual',
+    }, { onConflict: 'user_id,entry_date,metric,source' });
+    // Open memo sheet for optional emoji/note enrichment
     setBottomSheet(habit);
   };
 
   const handleBottomSheetDone = async (emoji: number | null, memo: string) => {
     if (!bottomSheet || !user) return;
     setBottomSheet(null);
-    // Save a health entry to mark it done today
-    await supabase.from('health_entries').upsert({
-      user_id: user.id,
-      entry_date: today,
-      metric: bottomSheet.key,
-      value: emoji ?? 1,
-      value_text: memo || null,
-      unit: 'check',
-      source: 'manual',
-    }, { onConflict: 'user_id,entry_date,metric,source' });
-    setTodayEntries(prev => new Set([...prev, bottomSheet.key]));
-    setCompletedDates(prev => new Set([...prev, today]));
+    // Update entry with emoji/note if provided
+    if (emoji !== null || memo) {
+      await supabase.from('health_entries')
+        .update({ value: emoji ?? 1, value_text: memo || null })
+        .eq('user_id', user.id)
+        .eq('entry_date', today)
+        .eq('metric', bottomSheet.key)
+        .eq('source', 'manual');
+    }
+  };
+
+  const saveCustomGoal = (habitKey: string, goal: string) => {
+    const updated = { ...customGoals, [habitKey]: goal };
+    setCustomGoals(updated);
+    try { localStorage.setItem('fastwell_habit_goals', JSON.stringify(updated)); } catch {}
   };
 
   const addHabit = (habit: HabitDef) => {
@@ -708,9 +793,10 @@ export default function DashboardPage() {
             key={habit.key}
             habit={habit}
             done={todayEntries.has(habit.key)}
-            progress={habit.goal ?? ''}
+            customGoal={customGoals[habit.key]}
             onTick={() => handleTick(habit)}
             onCardTap={() => router.push(habit.href)}
+            onEdit={() => setGoalEditHabit(habit)}
           />
         ))}
 
@@ -754,6 +840,16 @@ export default function DashboardPage() {
           existing={allHabits.map(h => h.key)}
           onAdd={addHabit}
           onClose={() => setAddModal(false)}
+        />
+      )}
+
+      {/* Goal edit modal */}
+      {goalEditHabit && (
+        <GoalEditModal
+          habit={goalEditHabit}
+          currentGoal={customGoals[goalEditHabit.key] ?? goalEditHabit.goal ?? ''}
+          onSave={goal => saveCustomGoal(goalEditHabit.key, goal)}
+          onClose={() => setGoalEditHabit(null)}
         />
       )}
 
