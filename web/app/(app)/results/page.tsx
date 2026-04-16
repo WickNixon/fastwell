@@ -48,7 +48,7 @@ function habitColour(key: string, idx: number): string {
 
 // ─── Calendar Component ───────────────────────────────────────────────────────
 
-interface DayEntry { metric: string }
+interface DayEntry { metric: string; value?: number | null }
 
 function HabitCalendar({
   dayData,
@@ -134,14 +134,25 @@ function DaySummary({ dateStr, entries }: { dateStr: string; entries: DayEntry[]
         <p style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>Nothing logged this day.</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {entries.map((e, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, backgroundColor: habitColour(e.metric, i) }} />
-              <p style={{ fontSize: 13, fontFamily: 'Lato, sans-serif', color: 'var(--text)', textTransform: 'capitalize' }}>
-                {e.metric.replace(/_/g, ' ')}
-              </p>
-            </div>
-          ))}
+          {entries.map((e, i) => {
+            const UNIT_MAP: Record<string, string> = { water_ml: 'ml', exercise_minutes: 'mins', sleep_hours: 'h', steps: 'steps', meditation: 'mins', reading: 'mins', sleep_quality: '/5', energy_level: '/5' };
+            const unit = UNIT_MAP[e.metric] ?? '';
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, backgroundColor: habitColour(e.metric, i) }} />
+                  <p style={{ fontSize: 13, fontFamily: 'Lato, sans-serif', color: 'var(--text)', textTransform: 'capitalize' }}>
+                    {e.metric.replace(/_/g, ' ')}
+                  </p>
+                </div>
+                {e.value != null && e.value !== 1 && (
+                  <p style={{ fontSize: 13, fontFamily: 'Montserrat, sans-serif', fontWeight: 600, color: 'var(--primary)' }}>
+                    {e.value}{unit}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -626,17 +637,17 @@ export default function MePage() {
     try {
       const past = new Date(); past.setDate(past.getDate() - 60);
       const [{ data: entries }, { data: fastingDays }] = await Promise.all([
-        sb.from('health_entries').select('entry_date,metric')
+        sb.from('health_entries').select('entry_date,metric,value')
           .eq('user_id', profile.id).gte('entry_date', isoDate(past)),
         sb.from('fasting_sessions').select('started_at')
           .eq('user_id', profile.id).not('ended_at', 'is', null)
           .gte('started_at', past.toISOString()),
       ]);
       const map: Record<string, DayEntry[]> = {};
-      (entries ?? []).forEach((e: { entry_date: string; metric: string }) => {
+      (entries ?? []).forEach((e: { entry_date: string; metric: string; value?: number | null }) => {
         if (!map[e.entry_date]) map[e.entry_date] = [];
         if (!map[e.entry_date].find(x => x.metric === e.metric)) {
-          map[e.entry_date].push({ metric: e.metric });
+          map[e.entry_date].push({ metric: e.metric, value: e.value });
         }
       });
       (fastingDays ?? []).forEach((f: { started_at: string }) => {
