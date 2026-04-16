@@ -781,7 +781,7 @@ export default function MePage() {
             borderRadius: 12, padding: '14px 8px', textAlign: 'center',
           }}>
             <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 24, color: 'var(--primary)', lineHeight: 1 }}>
-              {value ?? '—'}
+              {value ?? 0}
             </p>
             <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{label}</p>
           </div>
