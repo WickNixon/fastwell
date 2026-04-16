@@ -9,7 +9,7 @@ import type { FastingSession } from '@/lib/types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function isoDate(d: Date) { return d.toISOString().split('T')[0]; }
+function isoDate(d: Date) { return d.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' }); }
 
 function calcLongestStreak(dates: string[]): number {
   if (!dates.length) return 0;
@@ -705,7 +705,7 @@ export default function MePage() {
 
   useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
 
-  const initials = profile?.first_name ? profile.first_name.slice(0, 2).toUpperCase() : '??';
+  const initials = profile?.first_name ? profile.first_name.charAt(0).toUpperCase() : '?';
   const tierLabel = profile?.subscription_tier === 'member' ? 'Member' : 'Subscriber';
   const tierColor = profile?.subscription_tier === 'member' ? '#5C8A34' : '#D06820';
   const fastCount = fasts.length;
@@ -747,7 +747,7 @@ export default function MePage() {
           </span>
         </div>
         <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 20, color: 'var(--text)', marginBottom: 6 }}>
-          {profile?.first_name ?? 'Welcome'}
+          {profile?.first_name ?? ''}
         </p>
         <span style={{
           fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 12,

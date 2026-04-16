@@ -579,9 +579,9 @@ export default function DashboardPage() {
   const [insights, setInsights] = useState<{ id: string; insight_text: string }[]>([]);
 
   const today = isoDate(new Date());
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  const dateLabel = new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long' });
+  const hourNZ = parseInt(new Date().toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', hour12: false }));
+  const greeting = hourNZ >= 5 && hourNZ < 12 ? 'Good morning' : hourNZ >= 12 && hourNZ < 17 ? 'Good afternoon' : 'Good evening';
+  const dateLabel = new Date().toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'long' });
 
   const goalHours = getGoalHours(
     activeFast?.protocol ?? (selectedProtocol === 'Custom' ? `${customHours}h` : selectedProtocol),
