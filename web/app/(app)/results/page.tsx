@@ -165,19 +165,39 @@ interface ChartPoint { label: string; value: number }
 
 function BarChart({ points, color = '#5C8A34' }: { points: ChartPoint[]; color?: string }) {
   if (!points.length) return null;
+  const nonZero = points.filter(p => p.value > 0);
   const max = Math.max(...points.map(p => p.value), 0.001);
-  const H = 60; const W = 100;
-  const barW = W / points.length - 1;
+  const H = 80; const W = 100;
+  const gap = 1.5;
+  const barW = Math.max((W / points.length) - gap, 2);
+  const showLabels = points.length <= 12;
+  const labelH = showLabels ? 14 : 0;
+  if (!nonZero.length) {
+    return (
+      <svg viewBox={`0 0 ${W} ${H + labelH}`} style={{ width: '100%', height: H + labelH + 4 }} preserveAspectRatio="none">
+        <text x={W / 2} y={(H + labelH) / 2 + 4} textAnchor="middle" fontSize={7} fill="#7A9A6A" fontFamily="Lato,sans-serif">
+          Nothing logged yet
+        </text>
+      </svg>
+    );
+  }
   return (
-    <svg viewBox={`0 0 ${W} ${H + 16}`} style={{ width: '100%', height: 76 }} preserveAspectRatio="none">
+    <svg viewBox={`0 0 ${W} ${H + labelH}`} style={{ width: '100%', height: H + labelH + 4 }} preserveAspectRatio="none">
       {points.map((p, i) => {
-        const h = (p.value / max) * H;
-        const x = i * (W / points.length);
+        const h = Math.max((p.value / max) * H, p.value > 0 ? 2 : 0);
+        const x = i * (W / points.length) + gap / 2;
+        const r = Math.min(2.5, barW / 2);
         return (
           <g key={i}>
-            <rect x={x} y={H - h} width={barW} height={h} fill={color} rx={1} opacity={0.85} />
-            {points.length <= 12 && (
-              <text x={x + barW / 2} y={H + 12} textAnchor="middle" fontSize={6} fill="#7A9A6A" fontFamily="Montserrat,sans-serif">
+            {h > 0 && (
+              <path
+                d={`M${x + r},${H - h} Q${x},${H - h} ${x},${H - h + r} L${x},${H} L${x + barW},${H} L${x + barW},${H - h + r} Q${x + barW},${H - h} ${x + barW - r},${H - h} Z`}
+                fill={color}
+                opacity={0.88}
+              />
+            )}
+            {showLabels && (
+              <text x={x + barW / 2} y={H + labelH - 1} textAnchor="middle" fontSize={5.5} fill="#7A9A6A" fontFamily="Montserrat,sans-serif" fontWeight="600">
                 {p.label}
               </text>
             )}
@@ -189,26 +209,52 @@ function BarChart({ points, color = '#5C8A34' }: { points: ChartPoint[]; color?:
 }
 
 function LineChart({ points, color = '#5C8A34' }: { points: ChartPoint[]; color?: string }) {
-  if (points.length < 2) return <BarChart points={points} color={color} />;
+  const nonZero = points.filter(p => p.value > 0);
+  if (points.length < 2 || !nonZero.length) {
+    return (
+      <svg viewBox="0 0 100 94" style={{ width: '100%', height: 98 }} preserveAspectRatio="none">
+        <text x={50} y={47} textAnchor="middle" fontSize={7} fill="#7A9A6A" fontFamily="Lato,sans-serif">
+          Nothing logged yet
+        </text>
+      </svg>
+    );
+  }
   const max = Math.max(...points.map(p => p.value), 0.001);
-  const min = Math.min(...points.map(p => p.value));
+  const min = Math.min(...nonZero.map(p => p.value));
   const range = max - min || 1;
-  const H = 60; const W = 100;
+  const H = 80; const W = 100;
+  const showLabels = points.length <= 12;
+  const labelH = showLabels ? 14 : 0;
   const toX = (i: number) => (i / (points.length - 1)) * W;
-  const toY = (v: number) => H - ((v - min) / range) * H;
-  const poly = points.map((p, i) => `${toX(i)},${toY(p.value)}`).join(' ');
+  const toY = (v: number) => 4 + ((H - 8) - ((v - min) / range) * (H - 8));
+  const activePoints = points.filter(p => p.value > 0);
+  const poly = activePoints.map((p, i) => `${toX(points.indexOf(p))},${toY(p.value)}`).join(' ');
+  const firstX = toX(points.indexOf(activePoints[0]));
+  const lastX = toX(points.indexOf(activePoints[activePoints.length - 1]));
+  const fillPath = `M${firstX},${H} L${poly.replace(/^\d+\.?\d*,\d+\.?\d*/, `${firstX},${toY(activePoints[0].value)}`)} L${lastX},${H} Z`;
+  const hexToRgba = (hex: string, a: number) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${a})`;
+  };
   return (
-    <svg viewBox={`0 0 ${W} ${H + 16}`} style={{ width: '100%', height: 76 }} preserveAspectRatio="none">
-      <polyline points={poly} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
-      {points.map((p, i) => (
-        <g key={i}>
-          <circle cx={toX(i)} cy={toY(p.value)} r={1.5} fill={color} />
-          {points.length <= 12 && (
-            <text x={toX(i)} y={H + 12} textAnchor="middle" fontSize={6} fill="#7A9A6A" fontFamily="Montserrat,sans-serif">
-              {p.label}
-            </text>
-          )}
-        </g>
+    <svg viewBox={`0 0 ${W} ${H + labelH}`} style={{ width: '100%', height: H + labelH + 4 }} preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={`grad-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.22" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+      <path d={fillPath} fill={`url(#grad-${color.replace('#', '')})`} />
+      <polyline points={poly} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      {activePoints.map((p, i) => (
+        <circle key={i} cx={toX(points.indexOf(p))} cy={toY(p.value)} r={2} fill={color} />
+      ))}
+      {showLabels && points.map((p, i) => (
+        <text key={i} x={toX(i)} y={H + labelH - 1} textAnchor="middle" fontSize={5.5} fill="#7A9A6A" fontFamily="Montserrat,sans-serif" fontWeight="600">
+          {p.label}
+        </text>
       ))}
     </svg>
   );
@@ -221,22 +267,19 @@ function ChartCard({
   points: ChartPoint[]; type: 'bar' | 'line'; color: string;
 }) {
   return (
-    <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+    <div style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 18px', marginBottom: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
         <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{title}</p>
-        {average && (
-          <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 13, color }}>
-            avg {average} <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-muted)' }}>{unit}</span>
+        {average ? (
+          <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 18, color, lineHeight: 1 }}>
+            {average}
+            <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-muted)', marginLeft: 3 }}>{unit}</span>
           </p>
+        ) : (
+          <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 12, color: 'var(--text-muted)' }}>avg —</p>
         )}
       </div>
-      {points.length > 0 ? (
-        type === 'bar' ? <BarChart points={points} color={color} /> : <LineChart points={points} color={color} />
-      ) : (
-        <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', padding: '12px 0', textAlign: 'center' }}>
-          No data yet for this period.
-        </p>
-      )}
+      {type === 'bar' ? <BarChart points={points} color={color} /> : <LineChart points={points} color={color} />}
     </div>
   );
 }
