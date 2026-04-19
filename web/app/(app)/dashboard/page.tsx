@@ -694,14 +694,19 @@ export default function DashboardPage() {
       // Today's health entries — metric, value, memo, emoji for cards and progress fill
       const { data: entries } = await sb
         .from('health_entries').select('metric, value, memo, emoji').eq('user_id', profile.id).eq('entry_date', today);
-      setTodayEntries(new Set((entries ?? []).map((e: { metric: string }) => e.metric)));
+      const entrySet = new Set<string>();
       const memos: Record<string, { emoji: string | null; memo: string | null }> = {};
       const values: Record<string, number> = {};
       for (const e of (entries ?? [])) {
-        if (e.emoji || e.memo) memos[e.metric] = { emoji: e.emoji ?? null, memo: e.memo ?? null };
+        entrySet.add(e.metric);
         const habitKey = METRIC_TO_HABIT[e.metric];
-        if (habitKey) values[habitKey] = (values[habitKey] ?? 0) + (e.value ?? 0);
+        if (habitKey) {
+          entrySet.add(habitKey);
+          values[habitKey] = (values[habitKey] ?? 0) + (e.value ?? 0);
+        }
+        if (e.emoji || e.memo) memos[e.metric] = { emoji: e.emoji ?? null, memo: e.memo ?? null };
       }
+      setTodayEntries(entrySet);
       setTodayMemos(memos);
       setTodayValues(values);
     } catch {}
