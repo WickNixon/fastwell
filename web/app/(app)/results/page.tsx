@@ -170,8 +170,16 @@ function BarChart({ points, color = '#5C8A34' }: { points: ChartPoint[]; color?:
   const H = 80; const W = 100;
   const gap = 1.5;
   const barW = Math.max((W / points.length) - gap, 2);
-  const showLabels = points.length <= 12;
-  const labelH = showLabels ? 14 : 0;
+  const isYear = points.length === 12;
+  const isMonth = points.length === 30;
+  const labelH = isYear ? 20 : 14;
+
+  const showThisLabel = (i: number, label: string): boolean => {
+    if (isMonth) { const day = parseInt(label, 10); return day === 1 || day % 5 === 0; }
+    return true;
+  };
+  const labelY = (i: number): number => isYear ? H + (i % 2 === 0 ? 9 : 16) : H + labelH - 1;
+
   if (!nonZero.length) {
     return (
       <svg viewBox={`0 0 ${W} ${H + labelH}`} style={{ width: '100%', height: H + labelH + 4 }} preserveAspectRatio="none">
@@ -196,8 +204,8 @@ function BarChart({ points, color = '#5C8A34' }: { points: ChartPoint[]; color?:
                 opacity={0.88}
               />
             )}
-            {showLabels && (
-              <text x={x + barW / 2} y={H + labelH - 1} textAnchor="middle" fontSize={5.5} fill="#7A9A6A" fontFamily="Montserrat,sans-serif" fontWeight="600">
+            {showThisLabel(i, p.label) && (
+              <text x={x + barW / 2} y={labelY(i)} textAnchor="middle" fontSize={5} fill="#7A9A6A" fontFamily="Montserrat,sans-serif" fontWeight="600">
                 {p.label}
               </text>
             )}
@@ -223,8 +231,9 @@ function LineChart({ points, color = '#5C8A34' }: { points: ChartPoint[]; color?
   const min = Math.min(...nonZero.map(p => p.value));
   const range = max - min || 1;
   const H = 80; const W = 100;
-  const showLabels = points.length <= 12;
-  const labelH = showLabels ? 14 : 0;
+  const isYear = points.length === 12;
+  const isMonth = points.length === 30;
+  const labelH = isYear ? 20 : 14;
   const toX = (i: number) => (i / (points.length - 1)) * W;
   const toY = (v: number) => 4 + ((H - 8) - ((v - min) / range) * (H - 8));
   const activePoints = points.filter(p => p.value > 0);
@@ -238,6 +247,11 @@ function LineChart({ points, color = '#5C8A34' }: { points: ChartPoint[]; color?
     const b = parseInt(hex.slice(5, 7), 16);
     return `rgba(${r},${g},${b},${a})`;
   };
+  const showThisLabel = (i: number, label: string): boolean => {
+    if (isMonth) { const day = parseInt(label, 10); return day === 1 || day % 5 === 0; }
+    return true;
+  };
+  const labelY = (i: number): number => isYear ? H + (i % 2 === 0 ? 9 : 16) : H + labelH - 1;
   return (
     <svg viewBox={`0 0 ${W} ${H + labelH}`} style={{ width: '100%', height: H + labelH + 4 }} preserveAspectRatio="none">
       <defs>
@@ -251,8 +265,8 @@ function LineChart({ points, color = '#5C8A34' }: { points: ChartPoint[]; color?
       {activePoints.map((p, i) => (
         <circle key={i} cx={toX(points.indexOf(p))} cy={toY(p.value)} r={2} fill={color} />
       ))}
-      {showLabels && points.map((p, i) => (
-        <text key={i} x={toX(i)} y={H + labelH - 1} textAnchor="middle" fontSize={5.5} fill="#7A9A6A" fontFamily="Montserrat,sans-serif" fontWeight="600">
+      {points.map((p, i) => showThisLabel(i, p.label) && (
+        <text key={i} x={toX(i)} y={labelY(i)} textAnchor="middle" fontSize={5} fill="#7A9A6A" fontFamily="Montserrat,sans-serif" fontWeight="600">
           {p.label}
         </text>
       ))}
