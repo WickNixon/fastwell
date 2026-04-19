@@ -160,10 +160,11 @@ function CalendarStrip({ completedDates }: { completedDates: Set<string> }) {
 // ─── Fasting Card ─────────────────────────────────────────────────────────────
 
 function FastingCard({
-  activeFast, elapsed, selectedProtocol, setSelectedProtocol,
-  customHours, setCustomHours, goalHours, onStart, onEnd, starting,
+  activeFast, completedFast, elapsed, selectedProtocol, setSelectedProtocol,
+  customHours, setCustomHours, goalHours, onStart, onEnd, onStartNew, starting,
 }: {
   activeFast: FastingSession | null;
+  completedFast: FastingSession | null;
   elapsed: number;
   selectedProtocol: string;
   setSelectedProtocol: (p: string) => void;
@@ -172,11 +173,36 @@ function FastingCard({
   goalHours: number;
   onStart: () => void;
   onEnd: () => void;
+  onStartNew: () => void;
   starting: boolean;
 }) {
   const goalSecs = goalHours * 3600;
   const remaining = Math.max(goalSecs - elapsed, 0);
   const progress = Math.min(elapsed / goalSecs, 1);
+
+  if (!activeFast && completedFast) {
+    const durationMins = completedFast.duration_minutes ??
+      (completedFast.ended_at
+        ? Math.floor((new Date(completedFast.ended_at).getTime() - new Date(completedFast.started_at).getTime()) / 60000)
+        : 0);
+    const h = Math.floor(durationMins / 60);
+    const m = durationMins % 60;
+    return (
+      <div style={{ backgroundColor: 'var(--surface)', border: '1.5px solid var(--primary)', borderRadius: 16, padding: '20px 20px 24px', marginBottom: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14, color: 'var(--text-muted)' }}>🕐 Fasting</span>
+          <span style={{ fontSize: 11, fontFamily: 'Montserrat, sans-serif', fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-pale)', padding: '2px 8px', borderRadius: 10 }}>✓ Complete</span>
+        </div>
+        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 34, color: 'var(--primary)', marginBottom: 4 }}>
+          {h}h {m}m
+        </p>
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', marginBottom: 20 }}>
+          {completedFast.protocol ?? 'Fast'} completed. Well done.
+        </p>
+        <button className="btn btn-primary" onClick={onStartNew} style={{ width: '100%' }}>Start a new fast</button>
+      </div>
+    );
+  }
 
   if (activeFast) {
     return (
@@ -548,6 +574,7 @@ export default function DashboardPage() {
 
   // Fasting state
   const [activeFast, setActiveFast] = useState<FastingSession | null>(null);
+  const [completedFast, setCompletedFast] = useState<FastingSession | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [selectedProtocol, setSelectedProtocol] = useState('17h');
   const [customHours, setCustomHours] = useState(17);
@@ -643,38 +670,44 @@ export default function DashboardPage() {
     const sb = getSupabase();
 
     try {
-      // Active fast
-      const { data: fast } = await sb
+      // Fetch most recent fast session (active or completed)
+      const { data: recentFast } = await sb
         .from('fasting_sessions').select('*').eq('user_id', profile.id)
-        .is('ended_at', null).order('started_at', { ascending: false }).limit(1).maybeSingle();
-      if (fast) {
-        setActiveFast(fast);
-        startTick(new Date(fast.started_at));
-        // Keep localStorage in sync as a fallback
+        .order('started_at', { ascending: false }).limit(1).maybeSingle();
+      if (recentFast && recentFast.ended_at === null) {
+        // Active fast — resume timer
+        setActiveFast(recentFast as FastingSession);
+        setCompletedFast(null);
+        startTick(new Date(recentFast.started_at));
         try {
           localStorage.setItem(FAST_KEY, JSON.stringify({
-            sessionId: fast.id, startedAt: fast.started_at,
-            protocol: fast.protocol, goalHours: getGoalHours(fast.protocol ?? '17h', 17),
+            sessionId: recentFast.id, startedAt: recentFast.started_at,
+            protocol: recentFast.protocol, goalHours: getGoalHours(recentFast.protocol ?? '17h', 17),
           }));
         } catch {}
       } else {
-        // No open session — try localStorage fallback
-        try {
-          const stored = localStorage.getItem(FAST_KEY);
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            setActiveFast({ id: parsed.sessionId, user_id: profile.id, started_at: parsed.startedAt, protocol: parsed.protocol, ended_at: null, duration_minutes: null, notes: null, created_at: parsed.startedAt } as FastingSession);
-            startTick(new Date(parsed.startedAt));
+        // No active fast — clear localStorage so stale data can't resurrect it
+        try { localStorage.removeItem(FAST_KEY); } catch {}
+        if (recentFast && recentFast.ended_at) {
+          // Recently completed fast — show quiet state if within 24 hours
+          const hoursSinceEnd = (Date.now() - new Date(recentFast.ended_at).getTime()) / 3600000;
+          if (hoursSinceEnd < 24) {
+            setCompletedFast(recentFast as FastingSession);
+            // Show popup once for uncelebrated completions (e.g. ended on another device)
+            if (!recentFast.completion_celebrated) {
+              sb.from('fasting_sessions').update({ completion_celebrated: true }).eq('id', recentFast.id).then(() => {});
+              checkBadge().then(badge => setGratification({ reason: 'fast', badge }));
+            }
           }
-        } catch {}
+        }
       }
     } catch {
-      // Supabase failed — try localStorage
+      // Supabase failed — use localStorage as fallback for active fasts only
       try {
         const stored = localStorage.getItem(FAST_KEY);
         if (stored) {
           const parsed = JSON.parse(stored);
-          setActiveFast({ id: parsed.sessionId, user_id: profile.id, started_at: parsed.startedAt, protocol: parsed.protocol, ended_at: null, duration_minutes: null, notes: null, created_at: parsed.startedAt } as FastingSession);
+          setActiveFast({ id: parsed.sessionId, user_id: profile.id, started_at: parsed.startedAt, protocol: parsed.protocol, ended_at: null, duration_minutes: null, notes: null, completion_celebrated: null, created_at: parsed.startedAt } as FastingSession);
           startTick(new Date(parsed.startedAt));
         }
       } catch {}
@@ -775,15 +808,19 @@ export default function DashboardPage() {
     setConfirmEnd(false);
     if (intervalRef.current) clearInterval(intervalRef.current);
     const sessionId = activeFast.id;
+    const endedAt = new Date().toISOString();
+    const durationMins = Math.floor(elapsed / 60);
     const { error: err } = await getSupabase().from('fasting_sessions')
-      .update({ ended_at: new Date().toISOString(), duration_minutes: Math.floor(elapsed / 60) })
+      .update({ ended_at: endedAt, duration_minutes: durationMins, completion_celebrated: true })
       .eq('id', sessionId);
     if (err) {
       startTick(new Date(activeFast.started_at));
       return;
     }
     try { localStorage.removeItem(FAST_KEY); } catch {}
+    const nowCompleted: FastingSession = { ...activeFast, ended_at: endedAt, duration_minutes: durationMins, completion_celebrated: true };
     setActiveFast(null);
+    setCompletedFast(nowCompleted);
     setElapsed(0);
     // Guard: only show popup once per session (prevents double-fire on slow taps)
     try {
@@ -872,6 +909,7 @@ export default function DashboardPage() {
       {/* Fasting Card */}
       <FastingCard
         activeFast={activeFast}
+        completedFast={completedFast}
         elapsed={elapsed}
         selectedProtocol={selectedProtocol}
         setSelectedProtocol={setSelectedProtocol}
@@ -880,6 +918,7 @@ export default function DashboardPage() {
         goalHours={goalHours}
         onStart={startFast}
         onEnd={() => setConfirmEnd(true)}
+        onStartNew={() => setCompletedFast(null)}
         starting={starting}
       />
 

@@ -68,7 +68,7 @@ export default function FastingTimerPage() {
         if (stored) {
           const parsed = JSON.parse(stored) as StoredFast;
           if (!cancelled) {
-            setActiveFast({ id: parsed.sessionId, user_id: profile.id, started_at: parsed.startedAt, protocol: parsed.protocol, ended_at: null, duration_minutes: null, notes: null, created_at: parsed.startedAt });
+            setActiveFast({ id: parsed.sessionId, user_id: profile.id, started_at: parsed.startedAt, protocol: parsed.protocol, ended_at: null, duration_minutes: null, notes: null, completion_celebrated: null, created_at: parsed.startedAt });
             startTick(new Date(parsed.startedAt));
           }
         }
@@ -106,7 +106,7 @@ export default function FastingTimerPage() {
             const stored = localStorage.getItem(FAST_KEY);
             if (stored) {
               const parsed = JSON.parse(stored) as StoredFast;
-              setActiveFast({ id: parsed.sessionId, user_id: profile.id, started_at: parsed.startedAt, protocol: parsed.protocol, ended_at: null, duration_minutes: null, notes: null, created_at: parsed.startedAt });
+              setActiveFast({ id: parsed.sessionId, user_id: profile.id, started_at: parsed.startedAt, protocol: parsed.protocol, ended_at: null, duration_minutes: null, notes: null, completion_celebrated: null, created_at: parsed.startedAt });
               startTick(new Date(parsed.startedAt));
             }
           } catch {}
@@ -119,7 +119,7 @@ export default function FastingTimerPage() {
           const stored = localStorage.getItem(FAST_KEY);
           if (stored) {
             const parsed = JSON.parse(stored) as StoredFast;
-            setActiveFast({ id: parsed.sessionId, user_id: profile.id, started_at: parsed.startedAt, protocol: parsed.protocol, ended_at: null, duration_minutes: null, notes: null, created_at: parsed.startedAt });
+            setActiveFast({ id: parsed.sessionId, user_id: profile.id, started_at: parsed.startedAt, protocol: parsed.protocol, ended_at: null, duration_minutes: null, notes: null, completion_celebrated: null, created_at: parsed.startedAt });
             startTick(new Date(parsed.startedAt));
           }
         } catch {}
@@ -170,7 +170,7 @@ export default function FastingTimerPage() {
     const sessionId = activeFast.id;
     const { error: err } = await getSupabase()
       .from('fasting_sessions')
-      .update({ ended_at: new Date().toISOString(), duration_minutes: Math.floor(elapsed / 60) })
+      .update({ ended_at: new Date().toISOString(), duration_minutes: Math.floor(elapsed / 60), completion_celebrated: true })
       .eq('id', sessionId);
     if (err) {
       setError(err.message);
