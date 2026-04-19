@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 
@@ -27,8 +28,16 @@ function dateLabelNZ() {
 }
 
 export default function MacrosPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const supabase = createClient();
+
+  const router = useRouter();
+
+  const isPro = profile?.subscription_tier === 'pro' || profile?.subscription_tier === 'member_pro';
+  const trialActive = profile?.pro_trial_ends_at
+    ? new Date(profile.pro_trial_ends_at) > new Date()
+    : false;
+  const hasProAccess = isPro || trialActive;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -162,6 +171,29 @@ export default function MacrosPage() {
         </div>
       </div>
 
+      {/* Pro gate */}
+      {!hasProAccess ? (
+        <div className="card" style={{ textAlign: 'center', padding: '28px 20px', marginBottom: 20 }}>
+          <p style={{ fontSize: 36, marginBottom: 16 }}>🔒</p>
+          <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 17, color: 'var(--text)', marginBottom: 10 }}>
+            Analyse your meals with a photo
+          </p>
+          <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 24 }}>
+            Snap a photo of your food and get an instant macro breakdown — protein, carbs, fats, and calories — without logging a single number.
+          </p>
+          <button
+            className="btn btn-primary"
+            onClick={() => router.push('/settings/subscription')}
+            style={{ marginBottom: 8 }}
+          >
+            Upgrade to Pro
+          </button>
+          <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 12, color: 'var(--text-muted)' }}>
+            14-day free trial
+          </p>
+        </div>
+      ) : (
+        <>
       {/* Log a meal CTA */}
       {!imagePreview && (
         <button
@@ -293,6 +325,33 @@ export default function MacrosPage() {
       {/* Hidden file inputs */}
       <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileChange} style={{ display: 'none' }} />
       <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
+        </>
+      )}
+
+      {/* Personalised Meal Plans — Coming Soon */}
+      <div style={{
+        backgroundColor: '#F4FAF0', border: '1px solid rgba(92, 138, 52, 0.3)',
+        borderRadius: 14, padding: '20px 18px', marginBottom: 20, marginTop: 20,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+          <span style={{ fontSize: 28, flexShrink: 0 }}>🥗</span>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 15, color: 'var(--text)', marginBottom: 6 }}>
+              Personalised Meal Plans
+            </p>
+            <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 12 }}>
+              Tell us your goals and we&apos;ll build your week — recipes, timing, and all.
+            </p>
+            <span style={{
+              display: 'inline-block', fontFamily: 'Montserrat, sans-serif', fontWeight: 600,
+              fontSize: 12, color: '#5C8A34', backgroundColor: '#EAF3DC',
+              padding: '4px 12px', borderRadius: 20,
+            }}>
+              Coming Soon
+            </span>
+          </div>
+        </div>
+      </div>
 
       {/* Photo sheet */}
       {showSheet && (
