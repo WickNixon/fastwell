@@ -11,8 +11,8 @@ Deno.serve(async (req) => {
 
   try {
     const { plan } = await req.json();
-    if (!plan || !['monthly', 'annual'].includes(plan)) {
-      return errorResponse('plan must be "monthly" or "annual"', 'INVALID_PLAN');
+    if (!plan || !['weekly', 'monthly', 'annual'].includes(plan)) {
+      return errorResponse('plan must be "weekly", "monthly", or "annual"', 'INVALID_PLAN');
     }
 
     const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, { apiVersion: '2024-06-20' });
@@ -20,34 +20,54 @@ Deno.serve(async (req) => {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('stripe_customer_id, first_name')
+      .select('stripe_customer_id, first_name, subscription_tier')
       .eq('id', user.id)
       .single();
+
+    const isMember = profile?.subscription_tier === 'member_pro' ||
+      (profile as unknown as { role?: string })?.role === 'member';
+
+    const priceMap = {
+      non_member: {
+        weekly: Deno.env.get('STRIPE_PRICE_NON_MEMBER_WEEKLY')!,
+        monthly: Deno.env.get('STRIPE_PRICE_NON_MEMBER_MONTHLY')!,
+        annual: Deno.env.get('STRIPE_PRICE_NON_MEMBER_ANNUAL')!,
+      },
+      member: {
+        weekly: Deno.env.get('STRIPE_PRICE_MEMBER_WEEKLY')!,
+        monthly: Deno.env.get('STRIPE_PRICE_MEMBER_MONTHLY')!,
+        annual: Deno.env.get('STRIPE_PRICE_MEMBER_ANNUAL')!,
+      },
+    };
+
+    const priceId = isMember ? priceMap.member[plan as 'weekly' | 'monthly' | 'annual']
+      : priceMap.non_member[plan as 'weekly' | 'monthly' | 'annual'];
+
+    if (!priceId) return errorResponse('Price not configured for this plan', 'MISSING_PRICE');
 
     let customerId = profile?.stripe_customer_id;
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: user.email,
         name: profile?.first_name ?? undefined,
-        metadata: { user_id: user.id, tier: 'subscriber' },
+        metadata: { user_id: user.id },
       });
       customerId = customer.id;
       await supabase.from('profiles').update({ stripe_customer_id: customerId }).eq('id', user.id);
     }
-
-    const priceId = plan === 'monthly'
-      ? Deno.env.get('STRIPE_PRICE_ID_SUBSCRIBER_MONTHLY')!
-      : Deno.env.get('STRIPE_PRICE_ID_SUBSCRIBER_ANNUAL')!;
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
       payment_method_collection: 'if_required',
       line_items: [{ price: priceId, quantity: 1 }],
-      subscription_data: { trial_period_days: 14, metadata: { user_id: user.id, tier: 'subscriber' } },
-      success_url: `${Deno.env.get('APP_URL') ?? 'https://fastwellapp.com'}/subscription/success`,
-      cancel_url: `${Deno.env.get('APP_URL') ?? 'https://fastwellapp.com'}/subscription/cancel`,
-      metadata: { user_id: user.id, tier: 'subscriber' },
+      subscription_data: {
+        trial_period_days: 14,
+        metadata: { user_id: user.id, plan },
+      },
+      success_url: `${Deno.env.get('APP_URL') ?? 'https://fastwellapp.com'}/settings/subscription?success=1`,
+      cancel_url: `${Deno.env.get('APP_URL') ?? 'https://fastwellapp.com'}/settings/subscription`,
+      metadata: { user_id: user.id, plan },
     });
 
     return jsonResponse({ url: session.url });
