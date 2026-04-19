@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 
-const HABIT_KEY = 'reading';
+const HABIT_KEY = 'reading_minutes';
 const DEFAULT_GOAL = 20;
 const UNIT = 'mins';
 

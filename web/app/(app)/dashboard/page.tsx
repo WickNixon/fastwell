@@ -49,8 +49,18 @@ const METRIC_TO_HABIT: Record<string, string> = {
   'sleep_hours': 'sleep',
   'steps': 'walking',
   'meditation': 'meditation',
+  'meditation_minutes': 'meditation',
   'reading': 'reading',
+  'reading_minutes': 'reading',
+  'caffeine': 'caffeine',
+  'caffeine_drinks': 'caffeine',
+  'veggies': 'veggies',
+  'fruits_veggies': 'veggies',
+  'review': 'review',
+  'day_review': 'review',
   'energy_level': 'energy',
+  'mood': 'mood',
+  'weight': 'weight',
 };
 
 const HABIT_UNITS: Record<string, string> = {

@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 
-const HABIT_KEY = 'review';
+const HABIT_KEY = 'day_review';
 const MOOD_LABELS = ['', 'Tough day', 'Hard', 'Okay', 'Good', 'Great day'];
 
 function getTodayNZ() {

@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 
-const HABIT_KEY = 'veggies';
+const HABIT_KEY = 'fruits_veggies';
 
 function getTodayNZ() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
