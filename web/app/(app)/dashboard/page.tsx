@@ -50,6 +50,7 @@ const METRIC_TO_HABIT: Record<string, string> = {
   'steps': 'walking',
   'meditation': 'meditation',
   'reading': 'reading',
+  'energy_level': 'energy',
 };
 
 const HABIT_UNITS: Record<string, string> = {
@@ -769,6 +770,13 @@ export default function DashboardPage() {
   }, [profile, today, startTick]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Re-fetch when user returns from a tracking page (tab/app refocus)
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [load]);
 
   const startFast = async () => {
     if (!user || starting) return;
