@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 function HomeIcon({ active }: { active: boolean }) {
   return (
@@ -66,22 +66,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { loading, user, profile } = useAuth();
-  const [timedOut, setTimedOut] = useState(false);
-
-  // Hard timeout: if auth loading takes more than 5s, show the page anyway
   useEffect(() => {
-    if (!loading) return;
-    const t = setTimeout(() => setTimedOut(true), 5000);
-    return () => clearTimeout(t);
-  }, [loading]);
-
-  useEffect(() => {
-    if (loading && !timedOut) return;
+    if (loading) return;
     if (!user) { router.push('/login'); return; }
     if (profile && !profile.onboarding_complete) { router.push('/onboarding/name'); }
-  }, [loading, timedOut, user, profile]);
+  }, [loading, user, profile]);
 
-  if (loading && !timedOut) {
+  if (loading) {
     return (
       <div className="loading-screen">
         <div className="spinner" />
