@@ -557,7 +557,6 @@ export default function DashboardPage() {
 
   // Gratification state
   const [gratification, setGratification] = useState<{ reason: 'fast' | 'habits'; badge: UserBadge | null } | null>(null);
-  const fastCompleteTriggeredRef = useRef(false);
   const habitsCompleteTriggeredRef = useRef('');
 
   // Calendar state
@@ -616,15 +615,6 @@ export default function DashboardPage() {
   }, []);
 
   const allHabits = [...DEFAULT_HABITS, ...customHabits];
-
-  // Fast completion detection
-  useEffect(() => {
-    if (activeFast && elapsed > 0 && remaining === 0 && !fastCompleteTriggeredRef.current) {
-      fastCompleteTriggeredRef.current = true;
-      checkBadge().then(badge => setGratification({ reason: 'fast', badge }));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remaining, activeFast, elapsed]);
 
   // All habits completion detection
   useEffect(() => {
@@ -750,7 +740,6 @@ export default function DashboardPage() {
   const startFast = async () => {
     if (!user || starting) return;
     setStarting(true);
-    fastCompleteTriggeredRef.current = false;
     const protocolToStore = selectedProtocol === 'Custom' ? `${customHours}h` : selectedProtocol;
     try {
       const { data, error: err } = await supabase
@@ -785,18 +774,23 @@ export default function DashboardPage() {
     if (!activeFast) return;
     setConfirmEnd(false);
     if (intervalRef.current) clearInterval(intervalRef.current);
+    const sessionId = activeFast.id;
     const { error: err } = await getSupabase().from('fasting_sessions')
       .update({ ended_at: new Date().toISOString(), duration_minutes: Math.floor(elapsed / 60) })
-      .eq('id', activeFast.id);
+      .eq('id', sessionId);
     if (err) {
-      // Restart tick and stay on page if update fails
       startTick(new Date(activeFast.started_at));
       return;
     }
     try { localStorage.removeItem(FAST_KEY); } catch {}
     setActiveFast(null);
     setElapsed(0);
-    // Show gratification sheet after manual fast end
+    // Guard: only show popup once per session (prevents double-fire on slow taps)
+    try {
+      const key = `fastwell_fast_popup_${sessionId}`;
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, '1');
+    } catch {}
     checkBadge().then(badge => setGratification({ reason: 'fast', badge }));
   };
 

@@ -43,7 +43,6 @@ export default function FastingTimerPage() {
   const [gratification, setGratification] = useState<{ badge: UserBadge | null } | null>(null);
   const [error, setError] = useState('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const fastCompleteTriggeredRef = useRef(false);
 
   const startTick = useCallback((startTime: Date) => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -138,7 +137,6 @@ export default function FastingTimerPage() {
     if (!user || starting) return;
     setStarting(true);
     setError('');
-    fastCompleteTriggeredRef.current = false;
     const protocolToStore = selectedProtocol === 'Custom' ? `${customHours}h` : selectedProtocol;
     const { data, error: err } = await supabase
       .from('fasting_sessions')
@@ -169,20 +167,25 @@ export default function FastingTimerPage() {
     if (!activeFast) return;
     setConfirm(false);
     if (intervalRef.current) clearInterval(intervalRef.current);
+    const sessionId = activeFast.id;
     const { error: err } = await getSupabase()
       .from('fasting_sessions')
       .update({ ended_at: new Date().toISOString(), duration_minutes: Math.floor(elapsed / 60) })
-      .eq('id', activeFast.id);
+      .eq('id', sessionId);
     if (err) {
       setError(err.message);
-      // Restart the tick so timer keeps running while showing error
       startTick(new Date(activeFast.started_at));
       return;
     }
     try { localStorage.removeItem(FAST_KEY); } catch {}
     setActiveFast(null);
     setElapsed(0);
-    // Check for new badge, then show gratification sheet
+    // Guard: only show popup once per session (prevents double-fire on slow taps)
+    try {
+      const key = `fastwell_fast_popup_${sessionId}`;
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, '1');
+    } catch {}
     try {
       if (profile) {
         const { data: badge } = await getSupabase()
@@ -220,15 +223,6 @@ export default function FastingTimerPage() {
   const goalSeconds = goalHours * 3600;
   const progress = Math.min(elapsed / goalSeconds, 1);
   const remaining = Math.max(goalSeconds - elapsed, 0);
-
-  // Fast completion detection
-  useEffect(() => {
-    if (activeFast && elapsed > 0 && remaining === 0 && !fastCompleteTriggeredRef.current) {
-      fastCompleteTriggeredRef.current = true;
-      breakFast();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remaining, activeFast, elapsed]);
 
   if (loading) {
     return <div className="loading-screen" style={{ background: 'var(--primary)' }}><div className="spinner" style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /></div>;
