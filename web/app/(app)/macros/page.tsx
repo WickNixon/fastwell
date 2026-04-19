@@ -1,9 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
+import UpgradeModal from '@/components/UpgradeModal';
 
 interface FoodLog {
   id: string; meal_name: string | null; image_url: string | null;
@@ -31,8 +31,6 @@ export default function MacrosPage() {
   const { user, profile } = useAuth();
   const supabase = createClient();
 
-  const router = useRouter();
-
   const isPro = profile?.subscription_tier === 'pro' || profile?.subscription_tier === 'member_pro';
   const trialActive = profile?.pro_trial_ends_at
     ? new Date(profile.pro_trial_ends_at) > new Date()
@@ -41,6 +39,7 @@ export default function MacrosPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  const [upgradeModalVisible, setUpgradeModalVisible] = useState(false);
   const [showSheet, setShowSheet] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
@@ -183,7 +182,7 @@ export default function MacrosPage() {
           </p>
           <button
             className="btn btn-primary"
-            onClick={() => router.push('/settings/subscription')}
+            onClick={() => setUpgradeModalVisible(true)}
             style={{ marginBottom: 8 }}
           >
             Upgrade to Pro
@@ -352,6 +351,13 @@ export default function MacrosPage() {
           </div>
         </div>
       </div>
+
+      {/* Upgrade modal */}
+      <UpgradeModal
+        visible={upgradeModalVisible}
+        onClose={() => setUpgradeModalVisible(false)}
+        context="macros"
+      />
 
       {/* Photo sheet */}
       {showSheet && (

@@ -51,11 +51,10 @@ Deno.serve(async (req) => {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session;
       const userId = session.metadata?.user_id;
-      const tier = session.metadata?.tier;
       if (!userId) break;
 
       await supabase.from('profiles').update({
-        subscription_tier: tier,
+        subscription_tier: 'pro',
         subscription_status: 'trialing',
         stripe_customer_id: session.customer as string,
         stripe_subscription_id: session.subscription as string,
@@ -118,7 +117,7 @@ Deno.serve(async (req) => {
       if (!userId) break;
 
       await supabase.from('profiles').update({
-        subscription_tier: 'inactive',
+        subscription_tier: 'free',
         subscription_status: 'canceled',
       }).eq('id', userId);
       break;
