@@ -99,24 +99,30 @@ function formatElapsed(sec: number) {
 
 // ─── Calendar Strip ───────────────────────────────────────────────────────────
 
-function CalendarStrip({ completedDates }: { completedDates: Set<string> }) {
-  const [weekOffset, setWeekOffset] = useState(0); // 0 = current week
+function CalendarStrip({
+  completedDates, selectedDate, onDateSelect,
+}: {
+  completedDates: Set<string>;
+  selectedDate: string;
+  onDateSelect: (date: string) => void;
+}) {
+  const [weekOffset, setWeekOffset] = useState(0);
   const touchStartX = useRef(0);
 
   const today = new Date();
+  const todayStr = isoDate(today);
+
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(today);
     d.setDate(today.getDate() + weekOffset * 7 - 6 + i);
     return d;
   });
 
-  const todayStr = isoDate(today);
-
   const DAY_ABBRS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 
   return (
     <div
-      style={{ marginBottom: 24 }}
+      style={{ marginBottom: 8 }}
       onTouchStart={e => { touchStartX.current = e.touches[0].clientX; }}
       onTouchEnd={e => {
         const dx = e.changedTouches[0].clientX - touchStartX.current;
@@ -128,29 +134,31 @@ function CalendarStrip({ completedDates }: { completedDates: Set<string> }) {
         {days.map(d => {
           const str = isoDate(d);
           const isToday = str === todayStr;
+          const isSelected = str === selectedDate;
           const hasData = completedDates.has(str);
+          const isFuture = str > todayStr;
           return (
             <div
               key={str}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}
+              role="button"
+              tabIndex={0}
+              aria-label={str}
+              onClick={() => !isFuture && onDateSelect(str)}
+              onKeyDown={e => e.key === 'Enter' && !isFuture && onDateSelect(str)}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: isFuture ? 'default' : 'pointer' }}
             >
-              <span style={{
-                fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 11,
-                color: '#7A9A6A',
-              }}>
+              <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 11, color: '#7A9A6A' }}>
                 {DAY_ABBRS[d.getDay()]}
               </span>
-              <div
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: 36, height: 36, borderRadius: '50%',
-                  backgroundColor: isToday ? '#5C8A34' : hasData ? '#EAF3DC' : 'transparent',
-                  border: isToday ? 'none' : hasData ? 'none' : '1.5px solid #C8DFB0',
-                }}
-              >
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 36, height: 36, borderRadius: '50%',
+                backgroundColor: isSelected ? '#5C8A34' : hasData ? '#EAF3DC' : 'transparent',
+                border: isSelected ? 'none' : isToday ? '2px solid #5C8A34' : hasData ? 'none' : '1.5px solid #C8DFB0',
+              }}>
                 <span style={{
                   fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 13,
-                  color: isToday ? '#FFFFFF' : hasData ? '#5C8A34' : '#C8DFB0',
+                  color: isSelected ? '#FFFFFF' : isToday ? '#5C8A34' : hasData ? '#5C8A34' : '#C8DFB0',
                 }}>
                   {d.getDate()}
                 </span>
@@ -309,7 +317,7 @@ function FastingCard({
 // ─── Habit Card ───────────────────────────────────────────────────────────────
 
 function HabitCard({
-  habit, done, customGoal, memoEmoji, progress, onTick, onCardTap, onEdit,
+  habit, done, customGoal, memoEmoji, progress, onTick, onCardTap, onEdit, readOnly,
 }: {
   habit: HabitDef;
   done: boolean;
@@ -319,6 +327,7 @@ function HabitCard({
   onTick: () => void;
   onCardTap: () => void;
   onEdit: () => void;
+  readOnly?: boolean;
 }) {
   const effectiveDone = done || progress >= 100;
   return (
@@ -363,14 +372,17 @@ function HabitCard({
         </div>
       </div>
       <button
-        onClick={e => { e.stopPropagation(); onTick(); }}
+        onClick={e => { e.stopPropagation(); if (!readOnly) onTick(); }}
+        disabled={readOnly}
         style={{
           width: 36, height: 36, borderRadius: '50%', border: 'none',
-          backgroundColor: effectiveDone ? 'var(--primary)' : 'var(--border)',
+          backgroundColor: effectiveDone ? 'var(--primary)' : readOnly ? 'transparent' : 'var(--border)',
           color: effectiveDone ? '#FFFFFF' : 'var(--text-muted)',
           fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 16,
-          cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: readOnly ? 'default' : 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
           position: 'relative', zIndex: 1,
+          border: readOnly && !effectiveDone ? '1.5px solid var(--border)' : 'none',
+          opacity: readOnly && !effectiveDone ? 0.5 : 1,
         }}
         aria-label={effectiveDone ? `${habit.label} done` : `Complete ${habit.label}`}
       >
@@ -599,6 +611,7 @@ export default function DashboardPage() {
 
   // Calendar state
   const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
+  const [selectedDate, setSelectedDate] = useState(today);
 
   // Habit state
   const [customHabits, setCustomHabits] = useState<HabitDef[]>([]);
@@ -676,6 +689,29 @@ export default function DashboardPage() {
 
   useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
 
+  const fetchDayData = useCallback(async (date: string) => {
+    if (!profile) return;
+    try {
+      const { data: entries } = await getSupabase()
+        .from('health_entries').select('metric, value, memo, emoji').eq('user_id', profile.id).eq('entry_date', date);
+      const entrySet = new Set<string>();
+      const memos: Record<string, { emoji: string | null; memo: string | null }> = {};
+      const values: Record<string, number> = {};
+      for (const e of (entries ?? [])) {
+        entrySet.add(e.metric);
+        const habitKey = METRIC_TO_HABIT[e.metric];
+        if (habitKey) {
+          entrySet.add(habitKey);
+          values[habitKey] = (values[habitKey] ?? 0) + (e.value ?? 0);
+        }
+        if (e.emoji || e.memo) memos[e.metric] = { emoji: e.emoji ?? null, memo: e.memo ?? null };
+      }
+      setTodayEntries(entrySet);
+      setTodayMemos(memos);
+      setTodayValues(values);
+    } catch {}
+  }, [profile]);
+
   const load = useCallback(async () => {
     if (!profile) return;
     const sb = getSupabase();
@@ -724,26 +760,7 @@ export default function DashboardPage() {
       } catch {}
     }
 
-    try {
-      // Today's health entries — metric, value, memo, emoji for cards and progress fill
-      const { data: entries } = await sb
-        .from('health_entries').select('metric, value, memo, emoji').eq('user_id', profile.id).eq('entry_date', today);
-      const entrySet = new Set<string>();
-      const memos: Record<string, { emoji: string | null; memo: string | null }> = {};
-      const values: Record<string, number> = {};
-      for (const e of (entries ?? [])) {
-        entrySet.add(e.metric);
-        const habitKey = METRIC_TO_HABIT[e.metric];
-        if (habitKey) {
-          entrySet.add(habitKey);
-          values[habitKey] = (values[habitKey] ?? 0) + (e.value ?? 0);
-        }
-        if (e.emoji || e.memo) memos[e.metric] = { emoji: e.emoji ?? null, memo: e.memo ?? null };
-      }
-      setTodayEntries(entrySet);
-      setTodayMemos(memos);
-      setTodayValues(values);
-    } catch {}
+    await fetchDayData(today);
 
     try {
       // Completion dates (last 28 days for calendar)
@@ -777,16 +794,21 @@ export default function DashboardPage() {
         .order('generated_at', { ascending: false }).limit(2);
       setInsights(ins ?? []);
     } catch {}
-  }, [profile, today, startTick]);
+  }, [profile, today, startTick, fetchDayData]);
 
   useEffect(() => { load(); }, [load]);
 
   // Re-fetch when user returns from a tracking page (tab/app refocus)
   useEffect(() => {
-    const onVisible = () => { if (document.visibilityState === 'visible') load(); };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        setSelectedDate(today);
+        load();
+      }
+    };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [load]);
+  }, [load, today]);
 
   const startFast = async () => {
     if (!user || starting) return;
@@ -922,7 +944,49 @@ export default function DashboardPage() {
       <p className="body-sm mb-20" style={{ color: 'var(--text-muted)', textAlign: 'center' }}>{dateLabel}</p>
 
       {/* 7-day Calendar Strip */}
-      <CalendarStrip completedDates={completedDates} />
+      <CalendarStrip
+        completedDates={completedDates}
+        selectedDate={selectedDate}
+        onDateSelect={date => {
+          setSelectedDate(date);
+          fetchDayData(date);
+        }}
+      />
+
+      {/* Past date banner */}
+      {selectedDate !== today && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+          marginBottom: 16, padding: '8px 16px', backgroundColor: 'var(--primary-pale)',
+          borderRadius: 10,
+        }}>
+          <button
+            onClick={() => {
+              const d = new Date(selectedDate); d.setDate(d.getDate() - 1);
+              const prev = isoDate(d); setSelectedDate(prev); fetchDayData(prev);
+            }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontSize: 18, padding: '0 4px', lineHeight: 1 }}
+            aria-label="Previous day"
+          >←</button>
+          <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: 'var(--primary)', margin: 0 }}>
+            Viewing {new Date(selectedDate).toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'long', day: 'numeric', month: 'short' })}
+          </p>
+          {selectedDate < today && (
+            <button
+              onClick={() => {
+                const d = new Date(selectedDate); d.setDate(d.getDate() + 1);
+                const next = isoDate(d); setSelectedDate(next); fetchDayData(next);
+              }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontSize: 18, padding: '0 4px', lineHeight: 1 }}
+              aria-label="Next day"
+            >→</button>
+          )}
+          <button
+            onClick={() => { setSelectedDate(today); fetchDayData(today); }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontFamily: 'Lato, sans-serif', fontSize: 12, padding: '2px 8px', borderRadius: 6, border: '1px solid var(--primary)' }}
+          >Today</button>
+        </div>
+      )}
 
       {/* Fasting Card */}
       <FastingCard
@@ -969,8 +1033,8 @@ export default function DashboardPage() {
 
       {/* Habit Cards */}
       <div className="section">
-        <p className="section-label mb-10">Today's habits</p>
-        {habitError && (
+        <p className="section-label mb-10">{selectedDate === today ? "Today's habits" : "Habits logged"}</p>
+        {habitError && selectedDate === today && (
           <div style={{ background: '#FFF3F3', border: '1px solid #FFCDD2', color: '#C62828', borderRadius: 10, padding: '10px 14px', marginBottom: 12, fontSize: 13, fontFamily: 'Lato, sans-serif' }}>
             {habitError}
           </div>
@@ -981,6 +1045,7 @@ export default function DashboardPage() {
           const goalNum = goalToNumber(goalStr, habit.key);
           const actualValue = todayValues[habit.key] ?? 0;
           const progress = done ? 100 : (goalNum > 0 ? Math.min((actualValue / goalNum) * 100, 100) : 0);
+          const isReadOnly = selectedDate !== today;
           return (
           <HabitCard
             key={habit.key}
@@ -989,9 +1054,10 @@ export default function DashboardPage() {
             customGoal={goalStr}
             memoEmoji={todayMemos[habit.key]}
             progress={progress}
-            onTick={() => handleTick(habit)}
+            onTick={() => !isReadOnly && handleTick(habit)}
             onCardTap={() => router.push(habit.href)}
-            onEdit={() => setGoalEditHabit(habit)}
+            onEdit={() => !isReadOnly && setGoalEditHabit(habit)}
+            readOnly={isReadOnly}
           />
           );
         })}
