@@ -1,67 +1,81 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
+import AgeTumbler from '@/components/AgeTumbler';
 
 export default function OnboardingAgePage() {
   const { user, profile } = useAuth();
   const router = useRouter();
-  const [age, setAge] = useState('');
+  const [age, setAge] = useState(52);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (profile?.age) setAge(String(profile.age));
+    if (profile?.age && profile.age >= 18 && profile.age <= 97) {
+      setAge(profile.age);
+    }
   }, [profile]);
 
-  const handleContinue = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const ageNum = parseInt(age);
-    if (!ageNum || ageNum < 18 || ageNum > 100 || !user) return;
+  const handleChange = useCallback((val: number) => setAge(val), []);
+
+  const handleContinue = async () => {
+    if (!user) return;
     setLoading(true);
-    await getSupabase().from('profiles').update({ age: ageNum }).eq('id', user.id);
+    await getSupabase().from('profiles').update({ age }).eq('id', user.id);
     router.push('/onboarding/stage');
   };
 
-  const name = profile?.first_name ?? 'there';
-
   return (
-    <div className="onboard-page">
-      <div className="dot-progress">
-        {[0,1,2,3,4,5].map(i => <div key={i} className={`dot ${i === 1 ? 'active' : ''}`} />)}
+    <div style={{ minHeight: '100vh', backgroundColor: '#F3F0E7', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
+      {/* Green header card */}
+      <div style={{
+        backgroundColor: '#1E8A4F',
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
+        padding: '52px 24px 28px',
+      }}>
+        {/* Progress dots */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 24 }}>
+          {[0,1,2,3,4].map(i => (
+            <div key={i} style={{
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: i === 0 ? '#FFFFFF' : 'rgba(255,255,255,0.35)',
+              width: i === 0 ? 18 : 6,
+            }} />
+          ))}
+        </div>
+        <h1 style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 28, color: '#FFFFFF', marginBottom: 6, letterSpacing: '-0.01em' }}>
+          How old are you?
+        </h1>
+        <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 15, color: 'rgba(255,255,255,0.82)' }}>
+          No judgment here.
+        </p>
       </div>
 
-      <h1 className="h1 mb-8">How old are you,</h1>
-      <h1 className="h1 mb-8" style={{ color: 'var(--primary)' }}>{name}?</h1>
-      <p className="body-sm mb-32">This helps us personalise your experience. No judgment here.</p>
+      {/* Content */}
+      <div style={{ flex: 1, padding: '32px 24px', display: 'flex', flexDirection: 'column' }}>
+        <AgeTumbler value={age} onChange={handleChange} />
 
-      <form onSubmit={handleContinue} className="flex flex-col flex-1">
-        <input
-          className="input"
-          type="number"
-          placeholder="Your age"
-          value={age}
-          onChange={e => setAge(e.target.value)}
-          min={18}
-          max={100}
-          autoFocus
-          style={{ fontSize: 20, padding: '16px 18px' }}
-        />
-
-        <div className="mt-auto">
+        <div style={{ marginTop: 'auto', paddingTop: 32 }}>
           <button
-            type="submit"
             className="btn btn-primary"
-            disabled={!age || parseInt(age) < 18 || loading}
+            onClick={handleContinue}
+            disabled={loading}
           >
             {loading ? 'Saving…' : 'Continue'}
           </button>
-          <button type="button" className="btn btn-ghost mt-8" onClick={() => router.push('/onboarding/stage')}>
+          <button
+            type="button"
+            className="btn btn-ghost mt-8"
+            onClick={() => router.push('/onboarding/stage')}
+          >
             Skip for now
           </button>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

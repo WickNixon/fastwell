@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
+import AgeTumbler from '@/components/AgeTumbler';
 
 const STAGES = [
   { key: 'perimenopause', label: 'Perimenopause' },
@@ -39,7 +40,8 @@ export default function SettingsProfilePage() {
   const router = useRouter();
 
   const [firstName, setFirstName] = useState('');
-  const [age, setAge] = useState('');
+  const [age, setAge] = useState(52);
+  const handleAgeChange = useCallback((val: number) => setAge(val), []);
   const [stage, setStage] = useState('');
   const [cycle, setCycle] = useState('');
   const [hrt, setHrt] = useState('');
@@ -52,7 +54,7 @@ export default function SettingsProfilePage() {
   useEffect(() => {
     if (profile) {
       setFirstName(profile.first_name ?? '');
-      setAge(profile.age ? String(profile.age) : '');
+      setAge(profile.age && profile.age >= 18 && profile.age <= 97 ? profile.age : 52);
       setStage(profile.menopause_stage ?? '');
       setCycle(profile.has_regular_cycle ?? '');
       setHrt(profile.on_hrt ?? '');
@@ -67,7 +69,7 @@ export default function SettingsProfilePage() {
     setSaveError('');
     const { error } = await supabase.from('profiles').update({
       first_name: firstName || null,
-      age: age ? parseInt(age) : null,
+      age,
       menopause_stage: stage || null,
       has_regular_cycle: cycle || null,
       on_hrt: hrt || null,
@@ -110,7 +112,7 @@ export default function SettingsProfilePage() {
 
       <div className="input-group">
         <label className="input-label">Age</label>
-        <input className="input" type="number" value={age} onChange={e => setAge(e.target.value)} placeholder="e.g. 52" min={18} max={99} />
+        <AgeTumbler value={age} onChange={handleAgeChange} />
       </div>
 
       <div className="input-group">
