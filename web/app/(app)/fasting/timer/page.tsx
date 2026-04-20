@@ -233,7 +233,7 @@ export default function FastingTimerPage() {
       <div className="timer-screen">
         <button
           onClick={() => router.back()}
-          style={{ position: 'absolute', top: 20, left: 20, color: 'rgba(255,255,255,0.7)', fontSize: 24, background: 'none', border: 'none', cursor: 'pointer' }}
+          style={{ position: 'absolute', top: 20, left: 20, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#FFFFFF', fontSize: 22, lineHeight: 1 }}
           aria-label="Back"
         >
           ‹
@@ -262,21 +262,37 @@ export default function FastingTimerPage() {
         )}
 
         <button
-          className="btn btn-white"
-          style={{ maxWidth: 240 }}
           onClick={() => setConfirm(true)}
+          style={{
+            height: 48,
+            borderRadius: 24,
+            backgroundColor: 'rgba(255,255,255,0.18)',
+            border: '1px solid rgba(255,255,255,0.35)',
+            color: '#FFFFFF',
+            fontFamily: 'Montserrat, sans-serif',
+            fontWeight: 600,
+            fontSize: 15,
+            cursor: 'pointer',
+            margin: '0 20px',
+            padding: '0 32px',
+            position: 'absolute',
+            bottom: 40,
+            left: 0,
+            right: 0,
+            width: 'calc(100% - 40px)',
+          }}
         >
-          Break my fast
+          End my fast
         </button>
 
         {confirm && (
           <div className="confirm-dialog">
             <div className="confirm-box">
-              <p className="h3 mb-8">Break your fast?</p>
-              <p className="body-sm mb-16">This will end your current fasting window.</p>
+              <p className="h3 mb-8">End your fast?</p>
+              <p className="body-sm mb-16">You can always start a new one when you&apos;re ready.</p>
               <div className="confirm-actions">
-                <button className="btn btn-outline btn-sm flex-1" onClick={() => setConfirm(false)}>Keep fasting</button>
-                <button className="btn btn-primary btn-sm flex-1" onClick={breakFast}>Break my fast</button>
+                <button className="btn btn-outline btn-sm flex-1" onClick={() => setConfirm(false)}>Keep going.</button>
+                <button className="btn btn-primary btn-sm flex-1" onClick={breakFast}>Yes, end my fast.</button>
               </div>
             </div>
           </div>
