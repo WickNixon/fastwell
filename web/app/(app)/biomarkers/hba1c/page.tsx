@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { Biomarker } from '@/lib/types';
+import { checkAndAwardBadges } from '@/lib/checkBadges';
 
 function getTodayNZ() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
@@ -55,6 +56,7 @@ export default function HbA1cPage() {
       setFeedback({ ok: true, msg: 'Reading saved' });
       setTimeout(() => setFeedback(null), 1500);
       await load();
+      checkAndAwardBadges(user.id).catch(() => {});
     }
     setSaving(false);
   };

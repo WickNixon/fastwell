@@ -45,7 +45,7 @@ export default function SettingsPage() {
         Log out
       </button>
 
-      <p className="body-sm text-center mt-20" style={{ opacity: 0.5 }}>Fastwell · v2.1.0</p>
+      <p className="body-sm text-center mt-20" style={{ opacity: 0.5 }}>Fastwell · v2.2.0</p>
     </div>
   );
 }

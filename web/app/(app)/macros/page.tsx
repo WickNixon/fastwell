@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import UpgradeModal from '@/components/UpgradeModal';
+import { checkAndAwardBadges } from '@/lib/checkBadges';
 
 interface FoodLog {
   id: string; meal_name: string | null; image_url: string | null;
@@ -132,6 +133,7 @@ export default function MacrosPage() {
       });
       setResult(null); setImageBase64(null); setImagePreview(null);
       await loadTodayLogs();
+      if (user) checkAndAwardBadges(user.id).catch(() => {});
     } catch {}
     setSaving(false);
   };
@@ -178,6 +180,7 @@ export default function MacrosPage() {
       setShowEditManual(false);
       setResult(null); setImageBase64(null); setImagePreview(null);
       await loadTodayLogs();
+      checkAndAwardBadges(user.id).catch(() => {});
     } catch {}
     setSaving(false);
   };

@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { FastingSession, UserBadge } from '@/lib/types';
+import { checkAndAwardBadges } from '@/lib/checkBadges';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -644,6 +645,7 @@ export default function DashboardPage() {
   const checkBadge = async (): Promise<UserBadge | null> => {
     if (!profile) return null;
     try {
+      await checkAndAwardBadges(profile.id);
       const { data } = await getSupabase()
         .from('user_badges').select('*')
         .eq('user_id', profile.id).eq('seen', false)

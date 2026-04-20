@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { FastingSession, UserBadge } from '@/lib/types';
+import { checkAndAwardBadges } from '@/lib/checkBadges';
 
 const PROTOCOLS = [
   { key: '17h', label: '17h', hours: 17 },
@@ -188,6 +189,7 @@ export default function FastingTimerPage() {
     } catch {}
     try {
       if (profile) {
+        await checkAndAwardBadges(profile.id);
         const { data: badge } = await getSupabase()
           .from('user_badges').select('*')
           .eq('user_id', profile.id).eq('seen', false)
