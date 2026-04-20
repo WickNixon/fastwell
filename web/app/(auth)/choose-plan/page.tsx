@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
 
@@ -44,14 +44,15 @@ const PLANS: PlanDef[] = [
   },
 ];
 
-function RadioCircleSelected() {
+function RadioCircle({ selected }: { selected: boolean }) {
   return (
     <div style={{
       width: 22, height: 22, borderRadius: 11, flexShrink: 0,
-      border: 'none', backgroundColor: 'white',
+      border: selected ? 'none' : '2px solid rgba(255,255,255,0.6)',
+      backgroundColor: selected ? 'white' : 'transparent',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
-      <div style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#1E8A4F' }} />
+      {selected && <div style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#1E8A4F' }} />}
     </div>
   );
 }
@@ -60,39 +61,27 @@ function RadioCircleUnselected() {
   return (
     <div style={{
       width: 22, height: 22, borderRadius: 11, flexShrink: 0,
-      border: '2px solid #E8E4D9', backgroundColor: 'transparent',
+      border: '2px solid #E8E4D9',
+      backgroundColor: 'transparent',
     }} />
   );
 }
 
-export default function PaywallPage() {
-  const { profile } = useAuth();
+export default function ChoosePlanPage() {
   const router = useRouter();
+  const { profile } = useAuth();
   const [selected, setSelected] = useState<PlanKey>('monthly');
   const [loading, setLoading] = useState(false);
-  const [fastCount, setFastCount] = useState(0);
-  const [badgeCount, setBadgeCount] = useState(0);
 
   const isMember = profile?.subscription_tier === 'member';
 
-  useEffect(() => {
-    if (!profile) return;
-    const sb = getSupabase();
-    Promise.all([
-      sb.from('fasting_sessions').select('id', { count: 'exact' }).eq('user_id', profile.id).not('ended_at', 'is', null),
-      sb.from('user_badges').select('id', { count: 'exact' }).eq('user_id', profile.id),
-    ]).then(([{ count: f }, { count: b }]) => {
-      setFastCount(f ?? 0);
-      setBadgeCount(b ?? 0);
-    });
-  }, [profile]);
-
   const getPrice = (plan: PlanDef) => isMember ? plan.memberPriceLabel : plan.priceLabel;
+
   const selectedPlan = PLANS.find(p => p.key === selected)!;
 
   const handleContinue = async () => {
     if (selected === 'payg') {
-      router.push('/dashboard');
+      router.push('/onboarding/name');
       return;
     }
     setLoading(true);
@@ -120,8 +109,23 @@ export default function PaywallPage() {
         borderBottomLeftRadius: 28,
         borderBottomRightRadius: 28,
         padding: '52px 24px 28px',
+        position: 'relative',
         flexShrink: 0,
       }}>
+        <button
+          onClick={() => router.back()}
+          style={{
+            position: 'absolute', top: 20, left: 20,
+            width: 40, height: 40, borderRadius: 20,
+            backgroundColor: 'rgba(255,255,255,0.18)',
+            border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#FFFFFF', fontSize: 22, lineHeight: 1,
+          }}
+          aria-label="Back"
+        >
+          ‹
+        </button>
         <h1 style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 28, color: '#FFFFFF', marginBottom: 8, marginTop: 8 }}>
           Choose a plan.
         </h1>
@@ -132,18 +136,6 @@ export default function PaywallPage() {
 
       {/* Body */}
       <div style={{ flex: 1, padding: '28px 20px 48px' }}>
-        {/* Progress summary */}
-        {(fastCount > 0 || badgeCount > 0) && (
-          <div style={{ backgroundColor: 'white', border: '1px solid #E8E4D9', borderRadius: 14, padding: '14px 16px', marginBottom: 20 }}>
-            <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: '#1A1A1A', lineHeight: 1.5, textAlign: 'center' }}>
-              {fastCount > 0 && `You&apos;ve completed ${fastCount} fast${fastCount === 1 ? '' : 's'}`}
-              {fastCount > 0 && badgeCount > 0 && ' and '}
-              {badgeCount > 0 && `earned ${badgeCount} badge${badgeCount === 1 ? '' : 's'}`}.
-              {' '}Keep that progress.
-            </p>
-          </div>
-        )}
-
         {/* Plan rows */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
           {PLANS.map(plan => {
@@ -167,6 +159,7 @@ export default function PaywallPage() {
                   marginTop: plan.badge ? 12 : 0,
                 }}
               >
+                {/* Floating badge */}
                 {plan.badge && (
                   <span style={{
                     position: 'absolute', top: -10, right: 14,
@@ -177,7 +170,11 @@ export default function PaywallPage() {
                     {plan.badge}
                   </span>
                 )}
-                {isSelected ? <RadioCircleSelected /> : <RadioCircleUnselected />}
+
+                {/* Radio */}
+                {isSelected ? <RadioCircle selected={true} /> : <RadioCircleUnselected />}
+
+                {/* Text */}
                 <div style={{ flex: 1 }}>
                   <p style={{
                     fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 15,
@@ -203,9 +200,12 @@ export default function PaywallPage() {
                     {plan.desc}
                   </p>
                 </div>
+
+                {/* Price */}
                 <p style={{
                   fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 14,
-                  color: isSelected ? 'white' : '#1A1A1A', flexShrink: 0,
+                  color: isSelected ? 'white' : '#1A1A1A',
+                  flexShrink: 0,
                 }}>
                   {getPrice(plan)}
                 </p>
@@ -226,7 +226,7 @@ export default function PaywallPage() {
 
         {/* Skip */}
         <button
-          onClick={() => router.push('/dashboard')}
+          onClick={() => router.push('/onboarding/name')}
           style={{
             width: '100%', background: 'none', border: 'none', cursor: 'pointer',
             fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14,
