@@ -177,6 +177,69 @@ function CalendarStrip({
   );
 }
 
+// ─── Choose Fast Sheet (F01) ──────────────────────────────────────────────────
+
+function ChooseFastSheet({
+  onStart, onClose, starting,
+}: {
+  onStart: (protocol: string, customHours?: number) => void;
+  onClose: () => void;
+  starting: boolean;
+}) {
+  const [protocol, setProtocol] = useState('17h');
+  const [customHrs, setCustomHrs] = useState(17);
+  const PROTOS = [
+    { key: '17h', label: '17h', desc: '17-hour fast', hours: 17 },
+    { key: '24h', label: '24h', desc: '24-hour fast', hours: 24 },
+    { key: 'Custom', label: 'Custom', desc: 'Set your hours', hours: 0 },
+  ];
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+        <div className="modal-handle" />
+        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 18, marginBottom: 6, color: 'var(--text)' }}>Choose your fast.</p>
+        <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: 'var(--text-muted)', marginBottom: 20 }}>Pick a window that works for you.</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+          {PROTOS.map(p => (
+            <button
+              key={p.key}
+              onClick={() => setProtocol(p.key)}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '14px 16px', borderRadius: 14,
+                border: `2px solid ${protocol === p.key ? '#1E8A4F' : 'var(--border)'}`,
+                backgroundColor: protocol === p.key ? '#D9ECE0' : 'var(--surface)',
+                cursor: 'pointer', textAlign: 'left',
+              }}
+            >
+              <div>
+                <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 15, color: protocol === p.key ? '#1E8A4F' : 'var(--text)' }}>{p.label}</p>
+                <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: 'var(--text-muted)' }}>{p.desc}</p>
+              </div>
+              {protocol === p.key && <span style={{ color: '#1E8A4F', fontSize: 18 }}>✓</span>}
+            </button>
+          ))}
+        </div>
+        {protocol === 'Custom' && (
+          <div className="input-group" style={{ marginBottom: 20 }}>
+            <label className="input-label">Hours to fast</label>
+            <input className="input" type="number" min={1} max={72} step={0.5} value={customHrs}
+              onChange={e => setCustomHrs(Math.max(1, parseFloat(e.target.value) || 1))} placeholder="e.g. 19" />
+          </div>
+        )}
+        <button
+          className="btn btn-primary"
+          onClick={() => { onStart(protocol, protocol === 'Custom' ? customHrs : undefined); onClose(); }}
+          disabled={starting}
+        >
+          {starting ? 'Starting…' : 'Start fast'}
+        </button>
+        <button className="btn btn-ghost mt-12" onClick={onClose}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Fasting Card ─────────────────────────────────────────────────────────────
 
 function FastingCard({
@@ -191,11 +254,12 @@ function FastingCard({
   customHours: number;
   setCustomHours: (h: number) => void;
   goalHours: number;
-  onStart: () => void;
+  onStart: (protocol?: string, customHours?: number) => void;
   onEnd: () => void;
   onStartNew: () => void;
   starting: boolean;
 }) {
+  const [showSheet, setShowSheet] = useState(false);
   const goalSecs = goalHours * 3600;
   const remaining = Math.max(goalSecs - elapsed, 0);
   const progress = Math.min(elapsed / goalSecs, 1);
@@ -264,54 +328,42 @@ function FastingCard({
   }
 
   return (
-    <div style={{
-      backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16,
-      padding: '20px 20px 24px', marginBottom: 16,
-    }}>
-      <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14, color: 'var(--text-muted)', marginBottom: 14 }}>
-        🕐 Fasting
-      </p>
-      <div style={{ display: 'flex', gap: 8, marginBottom: selectedProtocol === 'Custom' ? 12 : 16 }}>
-        {PROTOCOLS.map(p => (
-          <button
-            key={p}
-            onClick={() => setSelectedProtocol(p)}
-            style={{
-              flex: 1, padding: '8px 4px', borderRadius: 8,
-              border: `1.5px solid ${selectedProtocol === p ? 'var(--primary)' : 'var(--border)'}`,
-              backgroundColor: selectedProtocol === p ? 'var(--primary-pale)' : 'transparent',
-              fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 13,
-              color: selectedProtocol === p ? 'var(--primary)' : 'var(--text-muted)', cursor: 'pointer',
-            }}
-          >
-            {p}
-          </button>
-        ))}
+    <>
+      <div style={{
+        backgroundColor: 'var(--surface)', borderRadius: 20,
+        boxShadow: '0 6px 18px rgba(30,138,79,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+        height: 180, marginBottom: 16,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        padding: '20px 24px',
+      }}>
+        <h3 style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 18, color: '#1E8A4F', marginBottom: 8, textAlign: 'center' }}>
+          Ready to start a fast?
+        </h3>
+        <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: '#6B7066', textAlign: 'center', lineHeight: 1.35, marginBottom: 18 }}>
+          Pick your window. Your body takes care of the rest.
+        </p>
+        <button
+          onClick={() => setShowSheet(true)}
+          style={{
+            height: 44, borderRadius: 22, paddingLeft: 28, paddingRight: 28,
+            backgroundColor: '#1E8A4F',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.08), 0 6px 14px rgba(30,138,79,0.35)',
+            border: 'none', cursor: 'pointer',
+            color: '#FFFFFF', fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14,
+          }}
+        >
+          Start a fast
+        </button>
       </div>
-      {selectedProtocol === 'Custom' && (
-        <div className="input-group" style={{ marginBottom: 16 }}>
-          <label className="input-label">Hours to fast</label>
-          <input
-            className="input"
-            type="number"
-            min={1}
-            max={72}
-            step={0.5}
-            value={customHours}
-            onChange={e => setCustomHours(Math.max(1, parseFloat(e.target.value) || 1))}
-            placeholder="e.g. 19"
-          />
-        </div>
+      {showSheet && (
+        <ChooseFastSheet
+          onStart={(protocol, hrs) => onStart(protocol, hrs)}
+          onClose={() => setShowSheet(false)}
+          starting={starting}
+        />
       )}
-      <button
-        className="btn btn-primary"
-        onClick={onStart}
-        disabled={starting}
-        style={{ width: '100%' }}
-      >
-        {starting ? 'Starting…' : 'Start your fast →'}
-      </button>
-    </div>
+    </>
   );
 }
 
@@ -812,10 +864,12 @@ export default function DashboardPage() {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [load, today]);
 
-  const startFast = async () => {
+  const startFast = async (protocol?: string, customHrs?: number) => {
     if (!user || starting) return;
     setStarting(true);
-    const protocolToStore = selectedProtocol === 'Custom' ? `${customHours}h` : selectedProtocol;
+    const prot = protocol ?? selectedProtocol;
+    const hrs = customHrs ?? customHours;
+    const protocolToStore = prot === 'Custom' ? `${hrs}h` : prot;
     try {
       const { data, error: err } = await supabase
         .from('fasting_sessions')
