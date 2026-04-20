@@ -242,9 +242,76 @@ function ChooseFastSheet({
 
 // ─── Fasting Card ─────────────────────────────────────────────────────────────
 
+function BiomarkerLogSheet({
+  type, userId, onClose,
+}: {
+  type: 'blood_glucose' | 'ketones_blood';
+  userId: string;
+  onClose: () => void;
+}) {
+  const label = type === 'blood_glucose' ? 'Blood glucose' : 'Ketones';
+  const unit = type === 'blood_glucose' ? 'mmol/L' : 'mmol/L';
+  const placeholder = type === 'blood_glucose' ? 'e.g. 5.2' : 'e.g. 0.8';
+  const [value, setValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = async () => {
+    const num = parseFloat(value);
+    if (isNaN(num) || num <= 0) return;
+    setSaving(true);
+    await getSupabase().from('biomarkers').insert({
+      user_id: userId,
+      marker: type,
+      value: num,
+      unit,
+      recorded_at: new Date().toISOString(),
+    });
+    setSaved(true);
+    setTimeout(onClose, 800);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+        <div className="modal-handle" />
+        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 17, marginBottom: 6, color: 'var(--text)', textAlign: 'center' }}>
+          {type === 'blood_glucose' ? '🩸' : '🔥'} Log {label}
+        </p>
+        <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: 'var(--text-muted)', marginBottom: 20, textAlign: 'center' }}>
+          {type === 'blood_glucose' ? 'Enter your current blood glucose reading.' : 'Enter your current ketone reading.'}
+        </p>
+        {saved ? (
+          <p style={{ textAlign: 'center', color: '#1E8A4F', fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 15, padding: '16px 0' }}>✓ Saved</p>
+        ) : (
+          <>
+            <div className="input-group">
+              <label className="input-label">{label} ({unit})</label>
+              <input
+                className="input"
+                type="number"
+                step="0.1"
+                min="0"
+                value={value}
+                onChange={e => setValue(e.target.value)}
+                placeholder={placeholder}
+                autoFocus
+              />
+            </div>
+            <button className="btn btn-primary" onClick={handleSave} disabled={saving || !value}>
+              {saving ? 'Saving…' : 'Save reading'}
+            </button>
+            <button className="btn btn-ghost mt-12" onClick={onClose}>Cancel</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function FastingCard({
   activeFast, completedFast, elapsed, selectedProtocol, setSelectedProtocol,
-  customHours, setCustomHours, goalHours, onStart, onEnd, onStartNew, starting,
+  customHours, setCustomHours, goalHours, onStart, onEnd, onStartNew, starting, userId,
 }: {
   activeFast: FastingSession | null;
   completedFast: FastingSession | null;
@@ -258,8 +325,11 @@ function FastingCard({
   onEnd: () => void;
   onStartNew: () => void;
   starting: boolean;
+  userId?: string;
 }) {
   const [showSheet, setShowSheet] = useState(false);
+  const [showGlucoseSheet, setShowGlucoseSheet] = useState(false);
+  const [showKetonesSheet, setShowKetonesSheet] = useState(false);
   const goalSecs = goalHours * 3600;
   const remaining = Math.max(goalSecs - elapsed, 0);
   const progress = Math.min(elapsed / goalSecs, 1);
@@ -289,40 +359,86 @@ function FastingCard({
   }
 
   if (activeFast) {
+    // Circular ring dimensions
+    const R = 50;
+    const CIRC = 2 * Math.PI * R;
+    const offset = CIRC * (1 - progress);
+    const protocolLabel = (activeFast.protocol ?? '17h').toUpperCase();
     return (
       <div style={{
-        backgroundColor: 'var(--primary)', borderRadius: 16, padding: '20px 20px 24px',
-        marginBottom: 16,
+        backgroundColor: 'var(--surface)', borderRadius: 20,
+        boxShadow: '0 6px 18px rgba(30,138,79,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+        padding: '16px 16px 14px', marginBottom: 16, position: 'relative',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14, color: 'rgba(255,255,255,0.8)' }}>
-            🕐 Fasting
-          </span>
-          <span style={{ fontSize: 11, fontFamily: 'Montserrat, sans-serif', fontWeight: 600, color: '#A8E060', background: 'rgba(255,255,255,0.15)', padding: '2px 8px', borderRadius: 10 }}>
-            🟢 Active
-          </span>
-        </div>
-        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 38, color: '#FFFFFF', letterSpacing: 2, marginBottom: 8 }}>
-          {formatElapsed(remaining)}
+        {/* Top label */}
+        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 11, color: '#1E8A4F', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>
+          {protocolLabel} FAST · IN PROGRESS
         </p>
-        <div style={{ height: 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 3, marginBottom: 8 }}>
-          <div style={{ height: 6, backgroundColor: '#FFFFFF', borderRadius: 3, width: `${progress * 100}%`, transition: 'width 1s linear' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          {/* Progress ring */}
+          <div style={{ width: 120, height: 120, flexShrink: 0, position: 'relative' }}>
+            <svg width="120" height="120" viewBox="0 0 120 120" style={{ transform: 'rotate(-90deg)' }}>
+              <circle cx="60" cy="60" r={R} fill="none" stroke="rgba(30,138,79,0.12)" strokeWidth="10" />
+              <circle
+                cx="60" cy="60" r={R} fill="none"
+                stroke="#E2682A" strokeWidth="10"
+                strokeDasharray={CIRC}
+                strokeDashoffset={offset}
+                strokeLinecap="round"
+                style={{ transition: 'stroke-dashoffset 1s linear' }}
+              />
+            </svg>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 18, color: '#1A1A1A', lineHeight: 1, letterSpacing: '-0.5px' }}>
+                {formatElapsed(remaining)}
+              </p>
+              <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 10, color: '#6B7066', marginTop: 2 }}>remaining</p>
+            </div>
+          </div>
+
+          {/* Right: Log pills */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <button
+              onClick={() => setShowGlucoseSheet(true)}
+              style={{
+                height: 32, borderRadius: 8, border: '1px solid #E8E4D9',
+                backgroundColor: 'white', cursor: 'pointer', padding: '0 10px',
+                fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 12, color: '#1A1A1A',
+                textAlign: 'left',
+              }}
+            >
+              🩸 Log glucose
+            </button>
+            <button
+              onClick={() => setShowKetonesSheet(true)}
+              style={{
+                height: 32, borderRadius: 8, border: '1px solid #E8E4D9',
+                backgroundColor: 'white', cursor: 'pointer', padding: '0 10px',
+                fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 12, color: '#1A1A1A',
+                textAlign: 'left',
+              }}
+            >
+              🔥 Log ketones
+            </button>
+          </div>
         </div>
-        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', fontFamily: 'Lato, sans-serif', marginBottom: 16 }}>
-          {remaining > 0
-            ? `${Math.floor(remaining / 3600)}h ${Math.floor((remaining % 3600) / 60)}m remaining`
-            : 'Window complete — well done.'}
-        </p>
-        <button
-          onClick={onEnd}
-          style={{
-            background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)',
-            color: '#FFFFFF', padding: '10px 20px', borderRadius: 10, cursor: 'pointer',
-            fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14,
-          }}
-        >
-          End fast
-        </button>
+
+        {/* End fast text link */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+          <button
+            onClick={onEnd}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Lato, sans-serif', fontSize: 12, color: '#6B7066', textDecoration: 'underline', padding: 0 }}
+          >
+            End fast
+          </button>
+        </div>
+        {/* Log sheets */}
+        {showGlucoseSheet && userId && (
+          <BiomarkerLogSheet type="blood_glucose" userId={userId} onClose={() => setShowGlucoseSheet(false)} />
+        )}
+        {showKetonesSheet && userId && (
+          <BiomarkerLogSheet type="ketones_blood" userId={userId} onClose={() => setShowKetonesSheet(false)} />
+        )}
       </div>
     );
   }
@@ -1058,6 +1174,7 @@ export default function DashboardPage() {
         onEnd={() => setConfirmEnd(true)}
         onStartNew={() => setCompletedFast(null)}
         starting={starting}
+        userId={user?.id}
       />
 
       {/* End fast confirm */}

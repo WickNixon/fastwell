@@ -16,6 +16,14 @@ const PROTOCOLS = [
 
 const FAST_KEY = 'fastwell_active_fast';
 
+const MOOD_OPTIONS = [
+  { key: 'exhausted', label: 'EXHAUSTED' },
+  { key: 'low', label: 'LOW' },
+  { key: 'okay', label: 'OKAY' },
+  { key: 'good', label: 'GOOD' },
+  { key: 'energised', label: 'ENERGISED' },
+];
+
 interface StoredFast {
   sessionId: string;
   startedAt: string;
@@ -30,12 +38,71 @@ function getGoalHours(protocol: string, customHrs: number): number {
   return m ? parseFloat(m[1]) : customHrs;
 }
 
+function BiomarkerLogSheet({
+  type, userId, onClose,
+}: {
+  type: 'blood_glucose' | 'ketones_blood';
+  userId: string;
+  onClose: () => void;
+}) {
+  const label = type === 'blood_glucose' ? 'Blood glucose' : 'Ketones';
+  const unit = 'mmol/L';
+  const placeholder = type === 'blood_glucose' ? 'e.g. 5.2' : 'e.g. 0.8';
+  const [value, setValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = async () => {
+    const num = parseFloat(value);
+    if (isNaN(num) || num <= 0) return;
+    setSaving(true);
+    await getSupabase().from('biomarkers').insert({
+      user_id: userId,
+      marker: type,
+      value: num,
+      unit,
+      recorded_at: new Date().toISOString(),
+    });
+    setSaved(true);
+    setTimeout(onClose, 800);
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 }} onClick={onClose}>
+      <div style={{ backgroundColor: 'var(--surface)', borderRadius: '24px 24px 0 0', padding: '24px 20px 40px', width: '100%', maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+        <div style={{ width: 40, height: 4, backgroundColor: 'var(--border)', borderRadius: 2, margin: '0 auto 20px' }} />
+        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 17, marginBottom: 6, color: 'var(--text)', textAlign: 'center' }}>
+          {type === 'blood_glucose' ? '🩸' : '🔥'} Log {label}
+        </p>
+        <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: 'var(--text-muted)', marginBottom: 20, textAlign: 'center' }}>
+          {type === 'blood_glucose' ? 'Enter your current blood glucose reading.' : 'Enter your current ketone reading.'}
+        </p>
+        {saved ? (
+          <p style={{ textAlign: 'center', color: '#1E8A4F', fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 15, padding: '16px 0' }}>✓ Saved</p>
+        ) : (
+          <>
+            <div className="input-group">
+              <label className="input-label">{label} ({unit})</label>
+              <input className="input" type="number" step="0.1" min="0" value={value}
+                onChange={e => setValue(e.target.value)} placeholder={placeholder} autoFocus />
+            </div>
+            <button className="btn btn-primary" onClick={handleSave} disabled={saving || !value}>
+              {saving ? 'Saving…' : 'Save reading'}
+            </button>
+            <button className="btn btn-ghost mt-12" onClick={onClose}>Cancel</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function FastingTimerPage() {
   const { profile, user } = useAuth();
   const supabase = createClient();
   const router = useRouter();
   const [activeFast, setActiveFast] = useState<FastingSession | null>(null);
-  const [elapsed, setElapsed] = useState(0); // seconds
+  const [elapsed, setElapsed] = useState(0);
   const [selectedProtocol, setSelectedProtocol] = useState('17h');
   const [customHours, setCustomHours] = useState(17);
   const [loading, setLoading] = useState(true);
@@ -43,6 +110,9 @@ export default function FastingTimerPage() {
   const [confirm, setConfirm] = useState(false);
   const [gratification, setGratification] = useState<{ badge: UserBadge | null } | null>(null);
   const [error, setError] = useState('');
+  const [selectedMood, setSelectedMood] = useState<string | null>(null);
+  const [showGlucoseSheet, setShowGlucoseSheet] = useState(false);
+  const [showKetonesSheet, setShowKetonesSheet] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startTick = useCallback((startTime: Date) => {
@@ -54,15 +124,10 @@ export default function FastingTimerPage() {
 
   useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
 
-  // Resume on mount if session exists
   useEffect(() => {
-    if (!profile) {
-      setLoading(false);
-      return;
-    }
+    if (!profile) { setLoading(false); return; }
     let cancelled = false;
     const timer = setTimeout(() => {
-      // Hard timeout — fall back to localStorage if Supabase is slow
       if (cancelled) return;
       try {
         const stored = localStorage.getItem(FAST_KEY);
@@ -80,29 +145,17 @@ export default function FastingTimerPage() {
     (async () => {
       try {
         const { data } = await getSupabase()
-          .from('fasting_sessions')
-          .select('*')
-          .eq('user_id', profile.id)
-          .is('ended_at', null)
-          .order('started_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .from('fasting_sessions').select('*').eq('user_id', profile.id)
+          .is('ended_at', null).order('started_at', { ascending: false }).limit(1).maybeSingle();
         clearTimeout(timer);
         if (cancelled) return;
         if (data) {
-          // Sync to localStorage so we have a fresh fallback
           try {
-            localStorage.setItem(FAST_KEY, JSON.stringify({
-              sessionId: data.id,
-              startedAt: data.started_at,
-              protocol: data.protocol,
-              goalHours: getGoalHours(data.protocol ?? '17h', 17),
-            } satisfies StoredFast));
+            localStorage.setItem(FAST_KEY, JSON.stringify({ sessionId: data.id, startedAt: data.started_at, protocol: data.protocol, goalHours: getGoalHours(data.protocol ?? '17h', 17) } satisfies StoredFast));
           } catch {}
           setActiveFast(data);
           startTick(new Date(data.started_at));
         } else {
-          // No open session in Supabase — try localStorage fallback
           try {
             const stored = localStorage.getItem(FAST_KEY);
             if (stored) {
@@ -115,7 +168,6 @@ export default function FastingTimerPage() {
       } catch {
         clearTimeout(timer);
         if (cancelled) return;
-        // Supabase failed — use localStorage
         try {
           const stored = localStorage.getItem(FAST_KEY);
           if (stored) {
@@ -128,10 +180,7 @@ export default function FastingTimerPage() {
       if (!cancelled) setLoading(false);
     })();
 
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [profile, startTick]);
 
   const startFast = async () => {
@@ -142,21 +191,14 @@ export default function FastingTimerPage() {
     const { data, error: err } = await supabase
       .from('fasting_sessions')
       .insert({ user_id: user.id, protocol: protocolToStore, started_at: new Date().toISOString() })
-      .select()
-      .single();
-    if (err) {
-      setError(err.message);
-      setStarting(false);
-      return;
-    }
+      .select().single();
+    if (err) { setError(err.message); setStarting(false); return; }
     if (data) {
       setActiveFast(data as FastingSession);
       startTick(new Date(data.started_at));
       try {
         localStorage.setItem(FAST_KEY, JSON.stringify({
-          sessionId: data.id,
-          startedAt: data.started_at,
-          protocol: data.protocol,
+          sessionId: data.id, startedAt: data.started_at, protocol: data.protocol,
           goalHours: getGoalHours(data.protocol ?? protocolToStore, customHours),
         } satisfies StoredFast));
       } catch {}
@@ -173,15 +215,10 @@ export default function FastingTimerPage() {
       .from('fasting_sessions')
       .update({ ended_at: new Date().toISOString(), duration_minutes: Math.floor(elapsed / 60), completion_celebrated: true })
       .eq('id', sessionId);
-    if (err) {
-      setError(err.message);
-      startTick(new Date(activeFast.started_at));
-      return;
-    }
+    if (err) { setError(err.message); startTick(new Date(activeFast.started_at)); return; }
     try { localStorage.removeItem(FAST_KEY); } catch {}
     setActiveFast(null);
     setElapsed(0);
-    // Guard: only show popup once per session (prevents double-fire on slow taps)
     try {
       const key = `fastwell_fast_popup_${sessionId}`;
       if (localStorage.getItem(key)) return;
@@ -191,16 +228,13 @@ export default function FastingTimerPage() {
       if (profile) {
         await checkAndAwardBadges(profile.id);
         const { data: badge } = await getSupabase()
-          .from('user_badges').select('*')
-          .eq('user_id', profile.id).eq('seen', false)
+          .from('user_badges').select('*').eq('user_id', profile.id).eq('seen', false)
           .order('earned_at', { ascending: false }).limit(1).maybeSingle();
         setGratification({ badge: (badge as UserBadge) ?? null });
       } else {
         setGratification({ badge: null });
       }
-    } catch {
-      setGratification({ badge: null });
-    }
+    } catch { setGratification({ badge: null }); }
   };
 
   const collectBadge = async () => {
@@ -227,66 +261,150 @@ export default function FastingTimerPage() {
   const remaining = Math.max(goalSeconds - elapsed, 0);
 
   if (loading) {
-    return <div className="loading-screen" style={{ background: 'var(--primary)' }}><div className="spinner" style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /></div>;
+    return <div className="loading-screen" style={{ background: '#1E8A4F' }}><div className="spinner" style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /></div>;
   }
 
   if (activeFast) {
+    // SVG ring constants for 260×260 ring
+    const R = 112;
+    const CIRC = 2 * Math.PI * R;
+    const offset = CIRC * (1 - progress);
+
+    const startedDate = new Date(activeFast.started_at);
+    const startedLabel = startedDate.toLocaleTimeString('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase();
+
     return (
-      <div className="timer-screen">
-        <button
-          onClick={() => router.back()}
-          style={{ position: 'absolute', top: 20, left: 20, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#FFFFFF', fontSize: 22, lineHeight: 1 }}
-          aria-label="Back"
-        >
-          ‹
-        </button>
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: '#1E8A4F',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '0 24px 40px',
+        maxWidth: 480,
+        margin: '0 auto',
+        position: 'relative',
+      }}>
+        {/* Top bar */}
+        <div style={{ width: '100%', display: 'flex', alignItems: 'center', paddingTop: 20, marginBottom: 24 }}>
+          <button
+            onClick={() => router.back()}
+            style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF', fontSize: 20, flexShrink: 0 }}
+            aria-label="Back"
+          >
+            ‹
+          </button>
+          <p style={{ flex: 1, textAlign: 'center', fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 11, color: 'rgba(255,255,255,0.8)', letterSpacing: '0.16em', textTransform: 'uppercase' }}>
+            {(activeFast.protocol ?? '17h').toUpperCase()}-HOUR FAST
+          </p>
+          <div style={{ width: 36 }} />
+        </div>
 
-        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14, color: 'rgba(255,255,255,0.75)', marginBottom: 8 }}>
-          {activeFast.protocol ?? 'Fasting'} fast
-        </p>
+        {/* Progress ring */}
+        <div style={{ position: 'relative', width: 260, height: 260, marginBottom: 32 }}>
+          <svg width="260" height="260" viewBox="0 0 260 260" style={{ transform: 'rotate(-90deg)' }}>
+            <circle cx="130" cy="130" r={R} fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="12" />
+            <circle
+              cx="130" cy="130" r={R} fill="none"
+              stroke="#E2682A" strokeWidth="12"
+              strokeDasharray={CIRC}
+              strokeDashoffset={offset}
+              strokeLinecap="round"
+              style={{ transition: 'stroke-dashoffset 1s linear' }}
+            />
+          </svg>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 40, color: '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1 }}>
+              {formatTime(remaining)}
+            </p>
+            <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>remaining</p>
+            <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 10, color: 'rgba(255,255,255,0.6)', letterSpacing: '0.18em', textTransform: 'uppercase', marginTop: 12 }}>
+              STARTED {startedLabel}
+            </p>
+          </div>
+        </div>
 
-        <p className="timer-text" style={{ marginBottom: 12 }}>
-          {formatTime(remaining)}
-        </p>
+        {/* How are you feeling? */}
+        <div style={{ width: '100%', marginBottom: 20 }}>
+          <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 15, color: 'rgba(255,255,255,0.85)', textAlign: 'center', marginBottom: 12 }}>
+            How are you feeling?
+          </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+            {MOOD_OPTIONS.map(mood => {
+              const isSelected = selectedMood === mood.key;
+              return (
+                <div key={mood.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+                  <button
+                    onClick={() => setSelectedMood(isSelected ? null : mood.key)}
+                    style={{
+                      width: 36, height: 36, borderRadius: 18,
+                      backgroundColor: isSelected ? '#FFFFFF' : 'rgba(255,255,255,0.12)',
+                      border: `1px solid ${isSelected ? '#FFFFFF' : 'rgba(255,255,255,0.3)'}`,
+                      cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 11,
+                      color: isSelected ? '#1E8A4F' : 'transparent',
+                    }}
+                  >
+                    {isSelected ? '✓' : ''}
+                  </button>
+                  <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 9, color: 'rgba(255,255,255,0.65)', letterSpacing: '0.1em', textTransform: 'uppercase', textAlign: 'center', maxWidth: 48 }}>
+                    {mood.label}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
-        <p style={{ color: 'rgba(255,255,255,0.8)', fontFamily: 'Lato, sans-serif', fontSize: 16, marginBottom: 24 }}>
-          {remaining > 0
-            ? `${Math.floor(remaining / 3600)}h ${Math.floor((remaining % 3600) / 60)}m remaining`
-            : 'Window complete — well done.'}
-        </p>
-
-        <div className="progress-track" style={{ width: '100%', maxWidth: 300, marginBottom: 40 }}>
-          <div className="progress-fill" style={{ width: `${progress * 100}%` }} />
+        {/* Log buttons row */}
+        <div style={{ display: 'flex', gap: 12, width: '100%', marginBottom: 32 }}>
+          <button
+            onClick={() => setShowGlucoseSheet(true)}
+            style={{
+              flex: 1, height: 40, borderRadius: 12, paddingLeft: 16, paddingRight: 16,
+              backgroundColor: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)',
+              cursor: 'pointer',
+              fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13, color: '#FFFFFF',
+            }}
+          >
+            🩸 Log glucose
+          </button>
+          <button
+            onClick={() => setShowKetonesSheet(true)}
+            style={{
+              flex: 1, height: 40, borderRadius: 12, paddingLeft: 16, paddingRight: 16,
+              backgroundColor: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)',
+              cursor: 'pointer',
+              fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13, color: '#FFFFFF',
+            }}
+          >
+            🔥 Log ketones
+          </button>
         </div>
 
         {error && (
-          <p style={{ color: '#FFCDD2', fontFamily: 'Lato, sans-serif', fontSize: 14, marginBottom: 16 }}>{error}</p>
+          <p style={{ color: '#FFCDD2', fontFamily: 'Lato, sans-serif', fontSize: 14, marginBottom: 16, textAlign: 'center' }}>{error}</p>
         )}
 
+        {/* End my fast button */}
         <button
           onClick={() => setConfirm(true)}
           style={{
-            height: 48,
-            borderRadius: 24,
+            height: 48, borderRadius: 24,
             backgroundColor: 'rgba(255,255,255,0.18)',
             border: '1px solid rgba(255,255,255,0.35)',
             color: '#FFFFFF',
-            fontFamily: 'Montserrat, sans-serif',
-            fontWeight: 600,
-            fontSize: 15,
+            fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 15,
             cursor: 'pointer',
-            margin: '0 20px',
-            padding: '0 32px',
-            position: 'absolute',
-            bottom: 40,
-            left: 0,
-            right: 0,
-            width: 'calc(100% - 40px)',
+            width: '100%',
+            marginTop: 'auto',
           }}
         >
           End my fast
         </button>
 
+        {/* Confirm end dialog */}
         {confirm && (
           <div className="confirm-dialog">
             <div className="confirm-box">
@@ -300,6 +418,7 @@ export default function FastingTimerPage() {
           </div>
         )}
 
+        {/* Gratification sheet */}
         {gratification && (
           <div className="modal-overlay">
             <div className="modal-sheet">
@@ -312,11 +431,7 @@ export default function FastingTimerPage() {
                 Your body worked hard today{profile?.first_name ? `, ${profile.first_name}` : ''}. That matters.
               </p>
               {gratification.badge && (
-                <div style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  padding: 16, backgroundColor: '#FFF3E8', borderRadius: 12,
-                  border: '1px solid #E2682A', marginBottom: 20,
-                }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 16, backgroundColor: '#FFF3E8', borderRadius: 12, border: '1px solid #E2682A', marginBottom: 20 }}>
                   <span style={{ fontSize: 36, marginBottom: 8 }}>🏅</span>
                   <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 14, color: '#E2682A', textAlign: 'center' }}>
                     Badge earned: {gratification.badge.badge_name}
@@ -328,22 +443,26 @@ export default function FastingTimerPage() {
               </button>
               <button
                 onClick={() => { collectBadge(); router.push('/rewards'); }}
-                style={{
-                  marginTop: 12, background: 'none', border: 'none', cursor: 'pointer',
-                  color: 'var(--primary)', fontFamily: 'Lato, sans-serif', fontSize: 14,
-                  textDecoration: 'underline', width: '100%', textAlign: 'center', padding: 8,
-                }}
+                style={{ marginTop: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontFamily: 'Lato, sans-serif', fontSize: 14, textDecoration: 'underline', width: '100%', textAlign: 'center', padding: 8 }}
               >
                 View all milestones
               </button>
             </div>
           </div>
         )}
+
+        {/* Biomarker log sheets */}
+        {showGlucoseSheet && user && (
+          <BiomarkerLogSheet type="blood_glucose" userId={user.id} onClose={() => setShowGlucoseSheet(false)} />
+        )}
+        {showKetonesSheet && user && (
+          <BiomarkerLogSheet type="ketones_blood" userId={user.id} onClose={() => setShowKetonesSheet(false)} />
+        )}
       </div>
     );
   }
 
-  // Idle state
+  // Idle state — start a fast
   return (
     <div className="page page-top">
       <button
