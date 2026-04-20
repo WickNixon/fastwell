@@ -6,6 +6,51 @@ import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase-browser';
 import GreenHeader from '@/components/GreenHeader';
 
+function getStrengthScore(pw: string): number {
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pw)) score++;
+  return score;
+}
+
+function StrengthBar({ score }: { score: number }) {
+  const segmentColour = (i: number) => {
+    if (score === 0 || i >= score) return '#E8E4D9';
+    return score <= 2 ? '#E2682A' : '#1E8A4F';
+  };
+  const label = score === 0 ? '' : score <= 2 ? 'Medium strength.' : score === 3 ? 'Strong.' : 'Very strong.';
+  const labelColour = score <= 2 ? '#6B7066' : '#1E8A4F';
+  return (
+    <div style={{ marginTop: 10, marginBottom: 4 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: segmentColour(i), transition: 'background-color 0.2s' }} />
+        ))}
+      </div>
+      {label && (
+        <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: labelColour }}>{label}</p>
+      )}
+    </div>
+  );
+}
+
+function RequirementChip({ label, met }: { label: string; met: boolean }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      height: 22, paddingLeft: 6, paddingRight: 6, borderRadius: 11,
+      backgroundColor: met ? '#D9ECE0' : '#FBE4D6',
+      fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 11,
+      color: met ? '#1E8A4F' : '#E2682A',
+      transition: 'all 0.2s',
+    }}>
+      {label} {met ? '✓' : '✗'}
+    </span>
+  );
+}
+
 export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -16,7 +61,13 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const valid = email && password.length >= 8 && password === confirm;
+  const score = getStrengthScore(password);
+  const hasMinLength = password.length >= 8;
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasNumber = /[0-9!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password);
+  const confirmMatch = confirm.length > 0 && confirm === password;
+  const confirmMismatch = confirm.length > 0 && confirm !== password;
+  const valid = email.length > 0 && score >= 2 && password === confirm && confirm.length > 0;
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +86,7 @@ export default function SignupPage() {
       return;
     }
     if (data.user) {
-      router.push('/onboarding/name');
+      router.push('/auth/check-email?email=' + encodeURIComponent(email));
     } else {
       setError('Something went wrong. Please try again.');
       setLoading(false);
@@ -86,8 +137,13 @@ export default function SignupPage() {
                 {showPass ? '🙈' : '👁'}
               </button>
             </div>
-            {password && password.length < 8 && (
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>Minimum 8 characters</p>
+            {password.length > 0 && <StrengthBar score={score} />}
+            {password.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                <RequirementChip label="8+ characters" met={hasMinLength} />
+                <RequirementChip label="Uppercase" met={hasUppercase} />
+                <RequirementChip label="Number" met={hasNumber} />
+              </div>
             )}
           </div>
 
@@ -102,17 +158,22 @@ export default function SignupPage() {
                 onChange={e => setConfirm(e.target.value)}
                 autoComplete="new-password"
                 required
+                style={{
+                  borderColor: confirmMatch ? '#1E8A4F' : confirmMismatch ? '#E2682A' : undefined,
+                }}
               />
               <button type="button" className="eye-toggle" onClick={() => setShowConfirm(!showConfirm)}>
                 {showConfirm ? '🙈' : '👁'}
               </button>
             </div>
-            {confirm && confirm !== password && (
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>Passwords don&apos;t match</p>
-            )}
           </div>
 
-          <button type="submit" className="btn btn-primary mt-8" disabled={loading || !valid}>
+          <button
+            type="submit"
+            className="btn btn-primary mt-8"
+            disabled={loading || !valid}
+            style={{ opacity: loading || !valid ? 0.45 : 1 }}
+          >
             {loading ? 'Creating account…' : 'Continue'}
           </button>
         </form>

@@ -6,6 +6,51 @@ import { getSupabase } from '@/lib/supabase-browser';
 
 type Stage = 'loading' | 'animating' | 'setup' | 'invalid';
 
+function getStrengthScore(pw: string): number {
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pw)) score++;
+  return score;
+}
+
+function StrengthBar({ score }: { score: number }) {
+  const segmentColour = (i: number) => {
+    if (score === 0 || i >= score) return '#E8E4D9';
+    return score <= 2 ? '#E2682A' : '#1E8A4F';
+  };
+  const label = score === 0 ? '' : score <= 2 ? 'Medium strength.' : score === 3 ? 'Strong.' : 'Very strong.';
+  const labelColour = score <= 2 ? '#6B7066' : '#1E8A4F';
+  return (
+    <div style={{ marginTop: 10, marginBottom: 4 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: segmentColour(i), transition: 'background-color 0.2s' }} />
+        ))}
+      </div>
+      {label && (
+        <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: labelColour }}>{label}</p>
+      )}
+    </div>
+  );
+}
+
+function RequirementChip({ label, met }: { label: string; met: boolean }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      height: 22, paddingLeft: 6, paddingRight: 6, borderRadius: 11,
+      backgroundColor: met ? '#D9ECE0' : '#FBE4D6',
+      fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 11,
+      color: met ? '#1E8A4F' : '#E2682A',
+      transition: 'all 0.2s',
+    }}>
+      {label} {met ? '✓' : '✗'}
+    </span>
+  );
+}
+
 export default function InvitePage() {
   const { token } = useParams<{ token: string }>();
   const router = useRouter();
@@ -40,7 +85,6 @@ export default function InvitePage() {
     setInviteId(data.id);
     setStage('animating');
 
-    // Logo animation sequence
     setTimeout(() => setLogoVisible(true), 100);
     setTimeout(() => setLogoVisible(false), 1900);
     setTimeout(() => setStage('setup'), 2400);
@@ -48,7 +92,8 @@ export default function InvitePage() {
 
   const handleSetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 8 || password !== confirm) return;
+    const score = getStrengthScore(password);
+    if (score < 2 || password !== confirm) return;
     setLoading(true);
     setError('');
 
@@ -62,7 +107,6 @@ export default function InvitePage() {
     });
 
     if (signUpError) {
-      // Try signing in (may already have account from token)
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) {
         setError('Something went wrong. Please try again.');
@@ -71,7 +115,6 @@ export default function InvitePage() {
       }
     }
 
-    // Mark token used
     await supabase.from('invite_tokens').update({ used: true, used_at: new Date().toISOString() }).eq('id', inviteId);
     router.push('/onboarding/name');
   };
@@ -89,7 +132,7 @@ export default function InvitePage() {
       <div className="auth-page">
         <div style={{ textAlign: 'center', maxWidth: 320 }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🔗</div>
-          <h1 className="h2 mb-12">This link isn't valid</h1>
+          <h1 className="h2 mb-12">This link isn&apos;t valid</h1>
           <p className="body-sm mb-24">
             Your invite link may have expired or already been used. Contact your coach for a new one.
           </p>
@@ -129,15 +172,20 @@ export default function InvitePage() {
     );
   }
 
-  // setup stage
-  const valid = password.length >= 8 && password === confirm;
+  const score = getStrengthScore(password);
+  const hasMinLength = password.length >= 8;
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasNumber = /[0-9!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password);
+  const confirmMatch = confirm.length > 0 && confirm === password;
+  const confirmMismatch = confirm.length > 0 && confirm !== password;
+  const valid = score >= 2 && password === confirm && confirm.length > 0;
 
   return (
     <div className="auth-page" style={{ justifyContent: 'flex-start', paddingTop: 60 }}>
       <div style={{ width: '100%', maxWidth: 400 }}>
         <h1 className="h1 mb-8">Welcome to Fastwell.</h1>
-        <p className="body mb-4" style={{ color: 'var(--text-muted)' }}>Let's get you set up.</p>
-        <p className="body-sm mb-32">You're joining as a Wicked Wellbeing member — 3 months free.</p>
+        <p className="body mb-4" style={{ color: 'var(--text-muted)' }}>Let&apos;s get you set up.</p>
+        <p className="body-sm mb-32">You&apos;re joining as a Wicked Wellbeing member — 3 months free.</p>
 
         <div className="input-group mb-20">
           <label className="input-label">Email</label>
@@ -176,6 +224,14 @@ export default function InvitePage() {
                 {showPass ? '🙈' : '👁'}
               </button>
             </div>
+            {password.length > 0 && <StrengthBar score={score} />}
+            {password.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                <RequirementChip label="8+ characters" met={hasMinLength} />
+                <RequirementChip label="Uppercase" met={hasUppercase} />
+                <RequirementChip label="Number" met={hasNumber} />
+              </div>
+            )}
           </div>
 
           <div className="input-group">
@@ -188,6 +244,9 @@ export default function InvitePage() {
                 value={confirm}
                 onChange={e => setConfirm(e.target.value)}
                 required
+                style={{
+                  borderColor: confirmMatch ? '#1E8A4F' : confirmMismatch ? '#E2682A' : undefined,
+                }}
               />
             </div>
           </div>
@@ -196,6 +255,7 @@ export default function InvitePage() {
             type="submit"
             className="btn btn-primary mt-16"
             disabled={loading || !valid}
+            style={{ opacity: loading || !valid ? 0.45 : 1 }}
           >
             {loading ? 'Setting up…' : 'Continue'}
           </button>
