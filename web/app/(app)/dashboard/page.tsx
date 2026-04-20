@@ -375,7 +375,7 @@ function HabitCard({
         onClick={e => { e.stopPropagation(); if (!readOnly) onTick(); }}
         disabled={readOnly}
         style={{
-          width: 36, height: 36, borderRadius: '50%', border: 'none',
+          width: 36, height: 36, borderRadius: '50%',
           backgroundColor: effectiveDone ? 'var(--primary)' : readOnly ? 'transparent' : 'var(--border)',
           color: effectiveDone ? '#FFFFFF' : 'var(--text-muted)',
           fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 16,
