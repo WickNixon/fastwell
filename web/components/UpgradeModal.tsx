@@ -123,7 +123,7 @@ export default function UpgradeModal({ visible, onClose, context = 'general' }: 
                   {isSelected && (
                     <span style={{ position: 'absolute', top: 10, right: 10, fontSize: 14, color: '#3B82F6' }}>✓</span>
                   )}
-                  <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 11, color: '#5C8A34', marginBottom: 4 }}>
+                  <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 11, color: '#1E8A4F', marginBottom: 4 }}>
                     {plan.badge}
                   </p>
                   <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 16, color: 'var(--text)', marginBottom: 2 }}>
@@ -133,7 +133,7 @@ export default function UpgradeModal({ visible, onClose, context = 'general' }: 
                     {plan.perDay}
                   </p>
                   {plan.save && (
-                    <span style={{ fontSize: 11, fontFamily: 'Montserrat, sans-serif', fontWeight: 700, color: '#D06820', backgroundColor: '#FFF3E8', padding: '2px 6px', borderRadius: 6, display: 'inline-block', marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, fontFamily: 'Montserrat, sans-serif', fontWeight: 700, color: '#E2682A', backgroundColor: '#FFF3E8', padding: '2px 6px', borderRadius: 6, display: 'inline-block', marginBottom: 6 }}>
                       {plan.save}
                     </span>
                   )}
@@ -152,7 +152,7 @@ export default function UpgradeModal({ visible, onClose, context = 'general' }: 
           <div style={{ marginBottom: 24 }}>
             {FEATURES.map((f, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
-                <span style={{ color: '#5C8A34', fontSize: 16, flexShrink: 0, marginTop: 1 }}>✓</span>
+                <span style={{ color: '#1E8A4F', fontSize: 16, flexShrink: 0, marginTop: 1 }}>✓</span>
                 <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 15, color: 'var(--text)', lineHeight: 1.4 }}>
                   {f.text}{f.soon && <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 6 }}>coming soon</span>}
                 </p>
@@ -165,7 +165,7 @@ export default function UpgradeModal({ visible, onClose, context = 'general' }: 
             onClick={startCheckout}
             disabled={loading}
             style={{
-              width: '100%', background: '#5C8A34', color: '#fff', border: 'none',
+              width: '100%', background: '#1E8A4F', color: '#fff', border: 'none',
               borderRadius: 14, padding: '14px 20px', cursor: loading ? 'not-allowed' : 'pointer',
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
               opacity: loading ? 0.7 : 1,

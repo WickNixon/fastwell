@@ -50,7 +50,7 @@ const TOPICS: Topic[] = [
   {
     icon: '🌙',
     name: 'Regular Cycle',
-    colour: '#EAF3DC',
+    colour: '#D9ECE0',
     description: 'Understanding your hormonal rhythm and how to work with it',
     content: (
       <>
@@ -156,7 +156,7 @@ const TOPICS: Topic[] = [
   {
     icon: '☀️',
     name: 'Post-Menopause',
-    colour: '#F4FAF0',
+    colour: '#F3F0E7',
     description: '12 months after your last period — a new chapter of health',
     content: (
       <>

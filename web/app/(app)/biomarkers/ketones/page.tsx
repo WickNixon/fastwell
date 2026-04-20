@@ -9,9 +9,9 @@ import type { Biomarker } from '@/lib/types';
 
 // Plain language zones per changelog
 const ZONES = [
-  { label: 'Not yet in ketosis', min: 0, max: 0.5, color: '#7A9A6A' },
-  { label: 'Nutritional ketosis — fat burning zone ✓', min: 0.5, max: 3.0, color: '#5C8A34' },
-  { label: 'Deep ketosis', min: 3.0, max: Infinity, color: '#D06820' },
+  { label: 'Not yet in ketosis', min: 0, max: 0.5, color: '#6B7066' },
+  { label: 'Nutritional ketosis — fat burning zone ✓', min: 0.5, max: 3.0, color: '#1E8A4F' },
+  { label: 'Deep ketosis', min: 3.0, max: Infinity, color: '#E2682A' },
 ];
 
 function getZone(val: number) {
@@ -96,15 +96,15 @@ export default function KetonesPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
             <span style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: 'var(--text)' }}>Not yet in ketosis</span>
-            <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13, color: '#7A9A6A' }}>Under 0.5</span>
+            <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13, color: '#6B7066' }}>Under 0.5</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
             <span style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: 'var(--text)' }}>Nutritional ketosis (fat burning zone) ✓</span>
-            <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13, color: '#5C8A34' }}>0.5–3.0</span>
+            <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13, color: '#1E8A4F' }}>0.5–3.0</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0' }}>
             <span style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: 'var(--text)' }}>Deep ketosis</span>
-            <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13, color: '#D06820' }}>3.0+</span>
+            <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13, color: '#E2682A' }}>3.0+</span>
           </div>
         </div>
       </div>

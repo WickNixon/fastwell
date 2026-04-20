@@ -147,18 +147,18 @@ function CalendarStrip({
               onKeyDown={e => e.key === 'Enter' && !isFuture && onDateSelect(str)}
               style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: isFuture ? 'default' : 'pointer' }}
             >
-              <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 11, color: '#7A9A6A' }}>
+              <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 11, color: '#6B7066' }}>
                 {DAY_ABBRS[d.getDay()]}
               </span>
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 width: 36, height: 36, borderRadius: '50%',
-                backgroundColor: isSelected ? '#5C8A34' : hasData ? '#EAF3DC' : 'transparent',
-                border: isSelected ? 'none' : isToday ? '2px solid #5C8A34' : hasData ? 'none' : '1.5px solid #C8DFB0',
+                backgroundColor: isSelected ? '#1E8A4F' : hasData ? '#D9ECE0' : 'transparent',
+                border: isSelected ? 'none' : isToday ? '2px solid #1E8A4F' : hasData ? 'none' : '1.5px solid #E8E4D9',
               }}>
                 <span style={{
                   fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 13,
-                  color: isSelected ? '#FFFFFF' : isToday ? '#5C8A34' : hasData ? '#5C8A34' : '#C8DFB0',
+                  color: isSelected ? '#FFFFFF' : isToday ? '#1E8A4F' : hasData ? '#1E8A4F' : '#E8E4D9',
                 }}>
                   {d.getDate()}
                 </span>
@@ -348,7 +348,7 @@ function HabitCard({
       <div style={{
         position: 'absolute', top: 0, left: 0, height: '100%',
         width: `${progress}%`,
-        backgroundColor: '#EAF3DC',
+        backgroundColor: '#D9ECE0',
         transition: 'width 0.4s ease',
         zIndex: 0,
       }} />
@@ -562,10 +562,10 @@ function GratificationSheet({
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             padding: 16, backgroundColor: '#FFF3E8', borderRadius: 12,
-            border: '1px solid #D06820', marginBottom: 20,
+            border: '1px solid #E2682A', marginBottom: 20,
           }}>
             <span style={{ fontSize: 36, marginBottom: 8 }}>🏅</span>
-            <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 14, color: '#D06820', textAlign: 'center' }}>
+            <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 14, color: '#E2682A', textAlign: 'center' }}>
               Badge earned: {badge.badge_name}
             </p>
           </div>

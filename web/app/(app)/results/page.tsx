@@ -26,8 +26,8 @@ function calcLongestStreak(dates: string[]): number {
 // ─── Habit colour palette ─────────────────────────────────────────────────────
 
 const HABIT_COLOURS: Record<string, string> = {
-  fasting:    '#5C8A34',
-  exercise:   '#D06820',
+  fasting:    '#1E8A4F',
+  exercise:   '#E2682A',
   sleep:      '#6B9B4A',
   water:      '#4A90D9',
   walking:    '#9B6B4A',
@@ -89,7 +89,7 @@ function HabitCalendar({
                 style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer' }}
               >
                 {wi === 0 && (
-                  <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 10, color: '#7A9A6A' }}>
+                  <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 10, color: '#6B7066' }}>
                     {DAY_ABBRS[d.getDay()]}
                   </span>
                 )}
@@ -163,7 +163,7 @@ function DaySummary({ dateStr, entries }: { dateStr: string; entries: DayEntry[]
 
 interface ChartPoint { label: string; value: number }
 
-function BarChart({ points, color = '#5C8A34' }: { points: ChartPoint[]; color?: string }) {
+function BarChart({ points, color = '#1E8A4F' }: { points: ChartPoint[]; color?: string }) {
   if (!points.length) return null;
   const nonZero = points.filter(p => p.value > 0);
   const max = Math.max(...points.map(p => p.value), 0.001);
@@ -183,7 +183,7 @@ function BarChart({ points, color = '#5C8A34' }: { points: ChartPoint[]; color?:
   if (!nonZero.length) {
     return (
       <svg viewBox={`0 0 ${W} ${H + labelH}`} style={{ width: '100%', height: H + labelH + 4 }} preserveAspectRatio="none">
-        <text x={W / 2} y={(H + labelH) / 2 + 4} textAnchor="middle" fontSize={7} fill="#7A9A6A" fontFamily="Lato,sans-serif">
+        <text x={W / 2} y={(H + labelH) / 2 + 4} textAnchor="middle" fontSize={7} fill="#6B7066" fontFamily="Lato,sans-serif">
           Nothing logged yet
         </text>
       </svg>
@@ -205,7 +205,7 @@ function BarChart({ points, color = '#5C8A34' }: { points: ChartPoint[]; color?:
               />
             )}
             {showThisLabel(i, p.label) && (
-              <text x={x + barW / 2} y={labelY(i)} textAnchor="middle" fontSize={5} fill="#7A9A6A" fontFamily="Montserrat,sans-serif" fontWeight="600">
+              <text x={x + barW / 2} y={labelY(i)} textAnchor="middle" fontSize={5} fill="#6B7066" fontFamily="Montserrat,sans-serif" fontWeight="600">
                 {p.label}
               </text>
             )}
@@ -216,12 +216,12 @@ function BarChart({ points, color = '#5C8A34' }: { points: ChartPoint[]; color?:
   );
 }
 
-function LineChart({ points, color = '#5C8A34' }: { points: ChartPoint[]; color?: string }) {
+function LineChart({ points, color = '#1E8A4F' }: { points: ChartPoint[]; color?: string }) {
   const nonZero = points.filter(p => p.value > 0);
   if (points.length < 2 || !nonZero.length) {
     return (
       <svg viewBox="0 0 100 94" style={{ width: '100%', height: 98 }} preserveAspectRatio="none">
-        <text x={50} y={47} textAnchor="middle" fontSize={7} fill="#7A9A6A" fontFamily="Lato,sans-serif">
+        <text x={50} y={47} textAnchor="middle" fontSize={7} fill="#6B7066" fontFamily="Lato,sans-serif">
           Nothing logged yet
         </text>
       </svg>
@@ -266,7 +266,7 @@ function LineChart({ points, color = '#5C8A34' }: { points: ChartPoint[]; color?
         <circle key={i} cx={toX(points.indexOf(p))} cy={toY(p.value)} r={2} fill={color} />
       ))}
       {points.map((p, i) => showThisLabel(i, p.label) && (
-        <text key={i} x={toX(i)} y={labelY(i)} textAnchor="middle" fontSize={5} fill="#7A9A6A" fontFamily="Montserrat,sans-serif" fontWeight="600">
+        <text key={i} x={toX(i)} y={labelY(i)} textAnchor="middle" fontSize={5} fill="#6B7066" fontFamily="Montserrat,sans-serif" fontWeight="600">
           {p.label}
         </text>
       ))}
@@ -775,7 +775,7 @@ export default function MePage() {
 
   const initials = profile?.first_name ? profile.first_name.charAt(0).toUpperCase() : '?';
   const tierLabel = profile?.subscription_tier === 'member_pro' ? 'Member' : 'Pro';
-  const tierColor = profile?.subscription_tier === 'member_pro' ? '#5C8A34' : '#D06820';
+  const tierColor = profile?.subscription_tier === 'member_pro' ? '#1E8A4F' : '#E2682A';
   const fastCount = fasts.length;
   const avgFastHours = fastCount
     ? Math.floor(fasts.reduce((s, f) => s + (f.duration_minutes ?? 0), 0) / fastCount / 60)
@@ -887,11 +887,11 @@ export default function MePage() {
         </div>
         {trendData && (
           <>
-            <ChartCard title="Fasting duration" average={avgLabel(trendData.fasting)} unit="h" points={trendData.fasting} type="bar" color="#5C8A34" />
+            <ChartCard title="Fasting duration" average={avgLabel(trendData.fasting)} unit="h" points={trendData.fasting} type="bar" color="#1E8A4F" />
             <ChartCard title="Water intake" average={avgLabel(trendData.water, 0)} unit="ml" points={trendData.water} type="bar" color="#4A90D9" />
             <ChartCard title="Sleep" average={avgLabel(trendData.sleep)} unit="h" points={trendData.sleep} type="line" color="#6B9B4A" />
             <ChartCard title="Energy level" average={avgLabel(trendData.energy)} unit="/5" points={trendData.energy} type="line" color="#D9C44A" />
-            <ChartCard title="Weight" average={avgLabel(trendData.weight)} unit={profile?.weight_unit ?? 'kg'} points={trendData.weight} type="line" color="#D06820" />
+            <ChartCard title="Weight" average={avgLabel(trendData.weight)} unit={profile?.weight_unit ?? 'kg'} points={trendData.weight} type="line" color="#E2682A" />
             <ChartCard title="Steps" average={avgLabel(trendData.steps, 0)} unit="steps" points={trendData.steps} type="bar" color="#9B6B4A" />
           </>
         )}

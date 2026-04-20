@@ -297,10 +297,10 @@ export default function FastingTimerPage() {
                 <div style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center',
                   padding: 16, backgroundColor: '#FFF3E8', borderRadius: 12,
-                  border: '1px solid #D06820', marginBottom: 20,
+                  border: '1px solid #E2682A', marginBottom: 20,
                 }}>
                   <span style={{ fontSize: 36, marginBottom: 8 }}>🏅</span>
-                  <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 14, color: '#D06820', textAlign: 'center' }}>
+                  <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 14, color: '#E2682A', textAlign: 'center' }}>
                     Badge earned: {gratification.badge.badge_name}
                   </p>
                 </div>

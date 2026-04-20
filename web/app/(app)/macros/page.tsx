@@ -329,7 +329,7 @@ export default function MacrosPage() {
 
       {/* Personalised Meal Plans — Coming Soon */}
       <div style={{
-        backgroundColor: '#F4FAF0', border: '1px solid rgba(92, 138, 52, 0.3)',
+        backgroundColor: '#F3F0E7', border: '1px solid rgba(92, 138, 52, 0.3)',
         borderRadius: 14, padding: '20px 18px', marginBottom: 20, marginTop: 20,
       }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
@@ -343,7 +343,7 @@ export default function MacrosPage() {
             </p>
             <span style={{
               display: 'inline-block', fontFamily: 'Montserrat, sans-serif', fontWeight: 600,
-              fontSize: 12, color: '#5C8A34', backgroundColor: '#EAF3DC',
+              fontSize: 12, color: '#1E8A4F', backgroundColor: '#D9ECE0',
               padding: '4px 12px', borderRadius: 20,
             }}>
               Coming Soon

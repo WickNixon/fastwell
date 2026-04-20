@@ -73,17 +73,17 @@ export default function PaywallPage() {
       {/* Plan cards */}
       <div onClick={() => setPlan('annual')} className={`plan-card ${plan === 'annual' ? 'selected' : ''}`}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-          <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 16, color: '#2C4A1A' }}>Annual</p>
-          <span style={{ background: '#D06820', color: '#FFFFFF', borderRadius: 20, padding: '3px 10px', fontSize: 11, fontFamily: 'Montserrat, sans-serif', fontWeight: 600 }}>Save 30%</span>
+          <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 16, color: '#1A1A1A' }}>Annual</p>
+          <span style={{ background: '#E2682A', color: '#FFFFFF', borderRadius: 20, padding: '3px 10px', fontSize: 11, fontFamily: 'Montserrat, sans-serif', fontWeight: 600 }}>Save 30%</span>
         </div>
-        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 22, color: '#2C4A1A' }}>$159.52 NZD/year</p>
-        <p style={{ fontSize: 13, color: '#7A9A6A', fontFamily: 'Lato, sans-serif' }}>$13.29/month</p>
+        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 22, color: '#1A1A1A' }}>$159.52 NZD/year</p>
+        <p style={{ fontSize: 13, color: '#6B7066', fontFamily: 'Lato, sans-serif' }}>$13.29/month</p>
       </div>
 
       <div onClick={() => setPlan('monthly')} className={`plan-card ${plan === 'monthly' ? 'selected' : ''}`}>
-        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 16, color: '#2C4A1A', marginBottom: 4 }}>Monthly</p>
-        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 22, color: '#2C4A1A' }}>$18.99 NZD/month</p>
-        <p style={{ fontSize: 13, color: '#7A9A6A', fontFamily: 'Lato, sans-serif' }}>Cancel anytime</p>
+        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 16, color: '#1A1A1A', marginBottom: 4 }}>Monthly</p>
+        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 22, color: '#1A1A1A' }}>$18.99 NZD/month</p>
+        <p style={{ fontSize: 13, color: '#6B7066', fontFamily: 'Lato, sans-serif' }}>Cancel anytime</p>
       </div>
 
       <button
