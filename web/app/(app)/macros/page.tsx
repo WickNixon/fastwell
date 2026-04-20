@@ -49,6 +49,13 @@ export default function MacrosPage() {
   const [saving, setSaving] = useState(false);
   const [todayLogs, setTodayLogs] = useState<FoodLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
+  const [showEditManual, setShowEditManual] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editCalories, setEditCalories] = useState('');
+  const [editProtein, setEditProtein] = useState('');
+  const [editCarbs, setEditCarbs] = useState('');
+  const [editFat, setEditFat] = useState('');
+  const [editFibre, setEditFibre] = useState('');
 
   const today = todayNZ();
 
@@ -131,6 +138,48 @@ export default function MacrosPage() {
 
   const reset = () => {
     setResult(null); setImageBase64(null); setImagePreview(null); setAnalyzing(false);
+  };
+
+  const openEditManual = () => {
+    setEditName(result?.meal_name ?? '');
+    setEditCalories(result?.calories != null ? String(Math.round(result.calories)) : '');
+    setEditProtein(result?.protein_g != null ? String(Math.round(result.protein_g)) : '');
+    setEditCarbs(result?.carbs_g != null ? String(Math.round(result.carbs_g)) : '');
+    setEditFat(result?.fat_g != null ? String(Math.round(result.fat_g)) : '');
+    setEditFibre(result?.fibre_g != null ? String(Math.round(result.fibre_g)) : '');
+    setShowEditManual(true);
+  };
+
+  const saveEditedMeal = async () => {
+    if (!user) return;
+    setSaving(true);
+    let imageUrl: string | null = null;
+    if (imageBase64) {
+      try {
+        const filename = `${user.id}/${Date.now()}.jpg`;
+        const bytes = Uint8Array.from(atob(imageBase64), c => c.charCodeAt(0));
+        const { data: up } = await supabase.storage.from('food-images').upload(filename, bytes, { contentType: mediaType });
+        if (up) imageUrl = supabase.storage.from('food-images').getPublicUrl(filename).data.publicUrl;
+      } catch {}
+    }
+    try {
+      await supabase.from('food_logs').insert({
+        user_id: user.id,
+        meal_name: editName || result?.meal_name || 'Meal',
+        image_url: imageUrl,
+        calories: editCalories ? parseFloat(editCalories) : result?.calories ?? null,
+        protein_g: editProtein ? parseFloat(editProtein) : result?.protein_g ?? null,
+        carbs_g: editCarbs ? parseFloat(editCarbs) : result?.carbs_g ?? null,
+        fat_g: editFat ? parseFloat(editFat) : result?.fat_g ?? null,
+        fibre_g: editFibre ? parseFloat(editFibre) : result?.fibre_g ?? null,
+        confidence: 'manual',
+        notes: result?.notes ?? null,
+      });
+      setShowEditManual(false);
+      setResult(null); setImageBase64(null); setImagePreview(null);
+      await loadTodayLogs();
+    } catch {}
+    setSaving(false);
   };
 
   const totalCalories = todayLogs.reduce((s, l) => s + (l.calories ?? 0), 0);
@@ -246,7 +295,13 @@ export default function MacrosPage() {
               <button className="btn btn-primary" onClick={saveMeal} disabled={saving} style={{ marginBottom: 8 }}>
                 {saving ? 'Saving…' : 'Save this meal'}
               </button>
-              <button className="btn btn-ghost" onClick={reset}>Try again</button>
+              <button className="btn btn-ghost" onClick={reset} style={{ marginBottom: 4 }}>Retake photo.</button>
+              <button
+                onClick={openEditManual}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', fontSize: 13, textDecoration: 'underline', textUnderlineOffset: 2, width: '100%', textAlign: 'center', padding: '6px 0' }}
+              >
+                Edit manually
+              </button>
             </>
           )}
           {result?.error && (
@@ -329,7 +384,7 @@ export default function MacrosPage() {
 
       {/* Personalised Meal Plans — Coming Soon */}
       <div style={{
-        backgroundColor: '#F3F0E7', border: '1px solid rgba(92, 138, 52, 0.3)',
+        backgroundColor: '#F3F0E7', border: '1px solid rgba(30, 138, 79, 0.2)',
         borderRadius: 14, padding: '20px 18px', marginBottom: 20, marginTop: 20,
       }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
@@ -374,6 +429,41 @@ export default function MacrosPage() {
               🖼 Choose from library
             </button>
             <button className="btn btn-ghost" onClick={() => setShowSheet(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit manually sheet */}
+      {showEditManual && (
+        <div className="modal-overlay" onClick={() => setShowEditManual(false)}>
+          <div className="modal-sheet" style={{ backgroundColor: '#F3F0E7', maxHeight: '70vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <h2 style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 22, color: 'var(--text)', marginBottom: 4 }}>Edit macros</h2>
+            <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: 'var(--text-muted)', marginBottom: 20 }}>Adjust anything that looks off.</p>
+            {[
+              { label: 'MEAL NAME', value: editName, set: setEditName, type: 'text', placeholder: 'e.g. Chicken salad' },
+              { label: 'CALORIES', value: editCalories, set: setEditCalories, type: 'number', placeholder: 'e.g. 450' },
+              { label: 'PROTEIN (G)', value: editProtein, set: setEditProtein, type: 'number', placeholder: 'e.g. 32' },
+              { label: 'CARBS (G)', value: editCarbs, set: setEditCarbs, type: 'number', placeholder: 'e.g. 28' },
+              { label: 'FAT (G)', value: editFat, set: setEditFat, type: 'number', placeholder: 'e.g. 14' },
+              { label: 'FIBRE (G)', value: editFibre, set: setEditFibre, type: 'number', placeholder: 'e.g. 5' },
+            ].map(({ label, value, set, type, placeholder }) => (
+              <div key={label} className="input-group">
+                <label className="input-label">{label}</label>
+                <input
+                  className="input"
+                  type={type}
+                  value={value}
+                  onChange={e => set(e.target.value)}
+                  placeholder={placeholder}
+                  inputMode={type === 'number' ? 'numeric' : undefined}
+                />
+              </div>
+            ))}
+            <button className="btn btn-primary mt-8" onClick={saveEditedMeal} disabled={saving}>
+              {saving ? 'Saving…' : 'Save changes'}
+            </button>
+            <button className="btn btn-ghost mt-8" onClick={() => setShowEditManual(false)}>Cancel</button>
           </div>
         </div>
       )}
