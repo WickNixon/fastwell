@@ -4,28 +4,13 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
+import GreenHeader from '@/components/GreenHeader';
 
 const STAGES = [
-  {
-    key: 'perimenopause',
-    title: 'Perimenopause',
-    sub: "I still have periods but they're changing",
-  },
-  {
-    key: 'transition',
-    title: 'Menopause transition',
-    sub: 'My periods have been stopping and starting',
-  },
-  {
-    key: 'post_menopause',
-    title: 'Post-menopause',
-    sub: "I haven't had a period for 12+ months",
-  },
-  {
-    key: 'not_sure',
-    title: "Not sure",
-    sub: "I'm not certain which stage I'm at",
-  },
+  { key: 'perimenopause', title: 'Perimenopause', sub: "I still have periods but they're changing." },
+  { key: 'transition', title: 'Menopause transition', sub: 'Periods stopping and starting.' },
+  { key: 'post_menopause', title: 'Post-menopause', sub: "No period for 12+ months." },
+  { key: 'not_sure', title: 'Not sure', sub: "I don't know which stage I'm at." },
 ];
 
 export default function OnboardingStagePage() {
@@ -39,22 +24,22 @@ export default function OnboardingStagePage() {
     setSelected(key);
     setLoading(true);
     await getSupabase().from('profiles').update({ menopause_stage: key }).eq('id', user.id);
-    // Post-menopausal users skip the cycle question — it's not relevant
     const next = key === 'post_menopause' ? '/onboarding/hrt' : '/onboarding/cycle';
     setTimeout(() => router.push(next), 600);
   };
 
   return (
-    <div className="onboard-page">
-      <div className="dot-progress">
-        {[0,1,2,3,4,5].map(i => <div key={i} className={`dot ${i === 2 ? 'active' : ''}`} />)}
-      </div>
+    <div style={{ minHeight: '100vh', backgroundColor: '#F3F0E7', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
+      <GreenHeader
+        title="Where are you on your journey?"
+        subtitle="Pick whichever feels closest."
+        dotIndex={1}
+        totalDots={5}
+        showBack
+        onBack={() => router.back()}
+      />
 
-      <h1 className="h1 mb-8">Where are you in your</h1>
-      <h1 className="h1 mb-8" style={{ color: 'var(--primary)' }}>menopause journey?</h1>
-      <p className="body-sm mb-32">If you're not sure, that's okay — just pick the closest one.</p>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ flex: 1, padding: '32px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
         {STAGES.map(s => (
           <button
             key={s.key}

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
+import GreenHeader from '@/components/GreenHeader';
 
 const OPTIONS = [
   { key: 'yes_regular', title: 'Yes, regular' },
@@ -18,10 +19,6 @@ export default function OnboardingCyclePage() {
   const [cycleLength, setCycleLength] = useState('28');
   const [loading, setLoading] = useState(false);
 
-  const handleSelect = (key: string) => {
-    setSelected(key);
-  };
-
   const handleContinue = async () => {
     if (!selected || !user) return;
     setLoading(true);
@@ -34,48 +31,53 @@ export default function OnboardingCyclePage() {
   };
 
   return (
-    <div className="onboard-page">
-      <div className="dot-progress">
-        {[0,1,2,3,4,5].map(i => <div key={i} className={`dot ${i === 3 ? 'active' : ''}`} />)}
-      </div>
+    <div style={{ minHeight: '100vh', backgroundColor: '#F3F0E7', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
+      <GreenHeader
+        title="Are you still getting a regular period?"
+        subtitle="This helps us sync your fasting plan."
+        dotIndex={2}
+        totalDots={5}
+        showBack
+        onBack={() => router.back()}
+      />
 
-      <h1 className="h1 mb-32" style={{ color: 'var(--primary)' }}>Are you still getting a regular period?</h1>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-        {OPTIONS.map(o => (
-          <button
-            key={o.key}
-            className={`choice-card ${selected === o.key ? 'selected' : ''}`}
-            onClick={() => handleSelect(o.key)}
-          >
-            <div className="choice-title">{o.title}</div>
-          </button>
-        ))}
-      </div>
-
-      {selected === 'yes_regular' && (
-        <div className="input-group">
-          <label className="input-label">How long is your cycle usually? (days)</label>
-          <input
-            className="input"
-            type="number"
-            value={cycleLength}
-            onChange={e => setCycleLength(e.target.value)}
-            min={14}
-            max={60}
-            placeholder="28"
-          />
+      <div style={{ flex: 1, padding: '32px 24px', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
+          {OPTIONS.map(o => (
+            <button
+              key={o.key}
+              className={`choice-card ${selected === o.key ? 'selected' : ''}`}
+              onClick={() => setSelected(o.key)}
+            >
+              <div className="choice-title">{o.title}</div>
+            </button>
+          ))}
         </div>
-      )}
 
-      <div className="mt-auto">
-        <button
-          className="btn btn-primary"
-          disabled={!selected || loading}
-          onClick={handleContinue}
-        >
-          {loading ? 'Saving…' : 'Continue'}
-        </button>
+        {selected === 'yes_regular' && (
+          <div className="input-group">
+            <label className="input-label">Cycle length (days)</label>
+            <input
+              className="input"
+              type="number"
+              value={cycleLength}
+              onChange={e => setCycleLength(e.target.value)}
+              min={14}
+              max={60}
+              placeholder="28"
+            />
+          </div>
+        )}
+
+        <div style={{ marginTop: 'auto' }}>
+          <button
+            className="btn btn-primary"
+            disabled={!selected || loading}
+            onClick={handleContinue}
+          >
+            {loading ? 'Saving…' : 'Continue'}
+          </button>
+        </div>
       </div>
     </div>
   );

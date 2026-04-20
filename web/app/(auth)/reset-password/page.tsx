@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase-browser';
+import GreenHeader from '@/components/GreenHeader';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -19,8 +20,7 @@ export default function ResetPasswordPage() {
     if (!valid) return;
     setLoading(true);
     setError('');
-    const supabase = getSupabase();
-    const { error } = await supabase.auth.updateUser({ password });
+    const { error } = await getSupabase().auth.updateUser({ password });
     if (error) {
       setError('Unable to update password. The link may have expired.');
       setLoading(false);
@@ -30,17 +30,15 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="auth-page">
-      <div style={{ width: '100%', maxWidth: 400 }}>
-        <h1 className="h1 mb-8">Set a new password</h1>
-        <p className="body-sm mb-32">Choose something memorable — at least 8 characters.</p>
+    <div style={{ minHeight: '100vh', backgroundColor: '#F3F0E7', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
+      <GreenHeader
+        title="Set a new password."
+        subtitle="Choose something memorable — at least 8 characters."
+      />
 
+      <div style={{ flex: 1, padding: '32px 24px' }}>
         {error && (
-          <div style={{
-            background: '#FFF3F3', border: '1px solid #FFCDD2', borderRadius: 10,
-            padding: '12px 16px', marginBottom: 16, color: '#C62828',
-            fontSize: 14, fontFamily: 'Lato, sans-serif',
-          }}>
+          <div style={{ background: '#FFF3F3', border: '1px solid #FFCDD2', borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: '#C62828', fontSize: 14, fontFamily: 'Lato, sans-serif' }}>
             {error}
           </div>
         )}
@@ -76,17 +74,11 @@ export default function ResetPasswordPage() {
               />
             </div>
             {confirm && confirm !== password && (
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>
-                Passwords don't match
-              </p>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>Passwords don&apos;t match</p>
             )}
           </div>
 
-          <button
-            type="submit"
-            className="btn btn-primary mt-8"
-            disabled={loading || !valid}
-          >
+          <button type="submit" className="btn btn-primary mt-8" disabled={loading || !valid}>
             {loading ? 'Saving…' : 'Set new password'}
           </button>
         </form>

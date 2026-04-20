@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
+import GreenHeader from '@/components/GreenHeader';
 
 export default function OnboardingNamePage() {
   const { user } = useAuth();
@@ -20,26 +21,29 @@ export default function OnboardingNamePage() {
   };
 
   return (
-    <div className="onboard-page">
-      <div className="dot-progress">
-        {[0,1,2,3,4,5].map(i => <div key={i} className={`dot ${i === 0 ? 'active' : ''}`} />)}
-      </div>
+    <div style={{ minHeight: '100vh', backgroundColor: '#F3F0E7', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
+      <GreenHeader
+        title="What's your name?"
+        subtitle="We'll use this to personalise everything."
+        dotIndex={0}
+        totalDots={5}
+      />
 
-      <h1 className="h1 mb-8">Before anything else —</h1>
-      <h1 className="h1 mb-32" style={{ color: 'var(--primary)' }}>what should we call you?</h1>
+      <form onSubmit={handleContinue} style={{ flex: 1, padding: '32px 24px', display: 'flex', flexDirection: 'column' }}>
+        <div className="input-group">
+          <label className="input-label">First name</label>
+          <input
+            className="input"
+            type="text"
+            placeholder="Your first name"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            autoFocus
+            style={{ fontSize: 18 }}
+          />
+        </div>
 
-      <form onSubmit={handleContinue} className="flex flex-col flex-1">
-        <input
-          className="input"
-          type="text"
-          placeholder="Your first name"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          autoFocus
-          style={{ fontSize: 20, padding: '16px 18px' }}
-        />
-
-        <div className="mt-auto">
+        <div style={{ marginTop: 'auto' }}>
           <button
             type="submit"
             className="btn btn-primary"

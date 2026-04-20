@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase-browser';
+import GreenHeader from '@/components/GreenHeader';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -26,9 +27,7 @@ export default function SignupPage() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: { subscription_tier: 'subscriber' },
-      },
+      options: { data: { subscription_tier: 'subscriber' } },
     });
     if (error) {
       setError(error.message);
@@ -44,24 +43,15 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="auth-page">
-      <div style={{ width: '100%', maxWidth: 400 }}>
-        <div className="mb-32">
-          <h1 className="h1 mb-8">Create your account</h1>
-          <p className="body-sm">14 days free — no credit card needed.</p>
-        </div>
+    <div style={{ minHeight: '100vh', backgroundColor: '#F3F0E7', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
+      <GreenHeader
+        title="Create your account."
+        subtitle="Start feeling better in under 2 minutes."
+      />
 
+      <div style={{ flex: 1, padding: '32px 24px' }}>
         {error && (
-          <div style={{
-            background: '#FFF3F3',
-            border: '1px solid #FFCDD2',
-            borderRadius: 10,
-            padding: '12px 16px',
-            marginBottom: 16,
-            color: '#C62828',
-            fontSize: 14,
-            fontFamily: 'Lato, sans-serif',
-          }}>
+          <div style={{ background: '#FFF3F3', border: '1px solid #FFCDD2', borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: '#C62828', fontSize: 14, fontFamily: 'Lato, sans-serif' }}>
             {error}
           </div>
         )}
@@ -97,9 +87,7 @@ export default function SignupPage() {
               </button>
             </div>
             {password && password.length < 8 && (
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>
-                Minimum 8 characters
-              </p>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>Minimum 8 characters</p>
             )}
           </div>
 
@@ -120,24 +108,18 @@ export default function SignupPage() {
               </button>
             </div>
             {confirm && confirm !== password && (
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>
-                Passwords don't match
-              </p>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>Passwords don&apos;t match</p>
             )}
           </div>
 
-          <button
-            type="submit"
-            className="btn btn-primary mt-8"
-            disabled={loading || !valid}
-          >
-            {loading ? 'Creating account…' : 'Create my account'}
+          <button type="submit" className="btn btn-primary mt-8" disabled={loading || !valid}>
+            {loading ? 'Creating account…' : 'Continue'}
           </button>
         </form>
 
-        <p className="body-sm text-center mt-20">
+        <p style={{ textAlign: 'center', marginTop: 24, fontFamily: 'Lato, sans-serif', fontSize: 14, color: 'var(--text-muted)' }}>
           Already have an account?{' '}
-          <Link href="/login" style={{ color: 'var(--primary)', fontWeight: 600 }}>Log in</Link>
+          <Link href="/login" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}>Log in</Link>
         </p>
       </div>
     </div>

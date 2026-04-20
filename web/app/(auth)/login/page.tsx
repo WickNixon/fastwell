@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase-browser';
+import GreenHeader from '@/components/GreenHeader';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -33,26 +34,15 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="auth-page">
-      <div style={{ width: '100%', maxWidth: 400 }}>
-        {/* Logo */}
-        <div className="text-center mb-32">
-          <div style={{ fontSize: 40, marginBottom: 8 }}>🌿</div>
-          <h1 className="h1">Fastwell</h1>
-          <p className="body-sm mt-8">Your health companion</p>
-        </div>
+    <div style={{ minHeight: '100vh', backgroundColor: '#F3F0E7', display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
+      <GreenHeader
+        title="Welcome back."
+        subtitle="Log in to keep going."
+      />
 
+      <div style={{ flex: 1, padding: '32px 24px' }}>
         {error && (
-          <div style={{
-            background: '#FFF3F3',
-            border: '1px solid #FFCDD2',
-            borderRadius: 10,
-            padding: '12px 16px',
-            marginBottom: 16,
-            color: '#C62828',
-            fontSize: 14,
-            fontFamily: 'Lato, sans-serif',
-          }}>
+          <div style={{ background: '#FFF3F3', border: '1px solid #FFCDD2', borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: '#C62828', fontSize: 14, fontFamily: 'Lato, sans-serif' }}>
             {error}
           </div>
         )}
@@ -83,39 +73,29 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 required
               />
-              <button
-                type="button"
-                className="eye-toggle"
-                onClick={() => setShowPass(!showPass)}
-                aria-label={showPass ? 'Hide password' : 'Show password'}
-              >
+              <button type="button" className="eye-toggle" onClick={() => setShowPass(!showPass)} aria-label={showPass ? 'Hide password' : 'Show password'}>
                 {showPass ? '🙈' : '👁'}
               </button>
             </div>
           </div>
 
           <div style={{ textAlign: 'right', marginBottom: 24 }}>
-            <Link href="/forgot-password" style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>
+            <Link href="/forgot-password" style={{ fontSize: 13, color: '#E2682A', fontFamily: 'Lato, sans-serif' }}>
               Forgot password?
             </Link>
           </div>
 
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={loading || !email || !password}
-          >
+          <button type="submit" className="btn btn-primary" disabled={loading || !email || !password}>
             {loading ? 'Logging in…' : 'Log in'}
           </button>
         </form>
 
-        <div className="divider-text mt-20">or</div>
-
-        <Link href="/signup">
-          <button className="btn btn-outline" style={{ marginTop: 0 }}>
+        <p style={{ textAlign: 'center', marginTop: 24, fontFamily: 'Lato, sans-serif', fontSize: 14, color: 'var(--text-muted)' }}>
+          New to Fastwell?{' '}
+          <Link href="/signup" style={{ color: '#E2682A', fontWeight: 600, textDecoration: 'none' }}>
             Create an account
-          </button>
-        </Link>
+          </Link>
+        </p>
       </div>
     </div>
   );
