@@ -983,7 +983,7 @@ export default function DashboardPage() {
           )}
           <button
             onClick={() => { setSelectedDate(today); fetchDayData(today); }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontFamily: 'Lato, sans-serif', fontSize: 12, padding: '2px 8px', borderRadius: 6, border: '1px solid var(--primary)' }}
+            style={{ background: 'none', cursor: 'pointer', color: 'var(--primary)', fontFamily: 'Lato, sans-serif', fontSize: 12, padding: '2px 8px', borderRadius: 6, border: '1px solid var(--primary)' }}
           >Today</button>
         </div>
       )}
