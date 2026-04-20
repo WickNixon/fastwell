@@ -594,6 +594,7 @@ export default function DashboardPage() {
   const { profile, user } = useAuth();
   const supabase = createClient();
   const router = useRouter();
+  const today = isoDate(new Date());
 
   // Fasting state
   const [activeFast, setActiveFast] = useState<FastingSession | null>(null);
@@ -630,7 +631,6 @@ export default function DashboardPage() {
   // Insights
   const [insights, setInsights] = useState<{ id: string; insight_text: string }[]>([]);
 
-  const today = isoDate(new Date());
   const hourNZ = parseInt(new Date().toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', hour12: false }));
   const greeting = hourNZ >= 5 && hourNZ < 12 ? 'Good morning' : hourNZ >= 12 && hourNZ < 17 ? 'Good afternoon' : 'Good evening';
   const dateLabel = new Date().toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'long' });
