@@ -1076,7 +1076,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Trial warning */}
-      {profile?.subscription_tier === 'subscriber' && profile?.trial_ends_at && (() => {
+      {profile?.subscription_tier === 'pro' && profile?.trial_ends_at && (() => {
         const daysLeft = Math.ceil((new Date(profile.trial_ends_at).getTime() - Date.now()) / 86400000);
         if (daysLeft > 3) return null;
         return (
