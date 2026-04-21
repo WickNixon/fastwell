@@ -6,8 +6,6 @@ import { useAuth } from '@/lib/auth-context';
 const MENU = [
   { href: '/settings/profile', icon: '👤', label: 'Profile', sub: 'Name, age, stage' },
   { href: '/settings/subscription', icon: '💳', label: 'Subscription', sub: 'Plan, billing, trial' },
-  { href: '/rewards', icon: '🏅', label: 'My Milestones', sub: 'Badges and achievements' },
-  { href: '/settings/appearance', icon: '🎨', label: 'Appearance', sub: 'Light or dark mode' },
   { href: '/settings/change-password', icon: '🔒', label: 'Change password', sub: null },
   { href: '/settings/integrations', icon: '🔗', label: 'Integrations', sub: 'Apple Health, Garmin — coming soon' },
 ];

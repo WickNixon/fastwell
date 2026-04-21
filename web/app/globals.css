@@ -26,48 +26,6 @@ input, textarea, select { font: inherit; }
   --shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 
-/* ===== DARK MODE VARIABLES ===== */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0D1A07;
-    --surface: #1A2E0D;
-    --primary: #7CBB44;
-    --primary-deep: #A8D878;
-    --primary-pale: #1E3A10;
-    --accent: #E8842A;
-    --text: #D4EEC0;
-    --text-muted: #6B9B4A;
-    --border: #2E5018;
-    --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  }
-}
-
-html[data-theme="dark"] {
-  --bg: #0D1A07;
-  --surface: #1A2E0D;
-  --primary: #7CBB44;
-  --primary-deep: #A8D878;
-  --primary-pale: #1E3A10;
-  --accent: #E8842A;
-  --text: #D4EEC0;
-  --text-muted: #6B9B4A;
-  --border: #2E5018;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-}
-
-html[data-theme="light"] {
-  --bg: #F3F0E7;
-  --surface: #FFFFFF;
-  --primary: #1E8A4F;
-  --primary-deep: #14693A;
-  --primary-pale: #D9ECE0;
-  --accent: #E2682A;
-  --accent-pale: #FBE4D6;
-  --text: #1A1A1A;
-  --text-muted: #6B7066;
-  --border: #E8E4D9;
-  --shadow: 0 2px 8px rgba(0,0,0,0.04);
-}
 
 /* ===== BASE ===== */
 html, body {

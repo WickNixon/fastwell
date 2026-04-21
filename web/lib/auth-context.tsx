@@ -53,17 +53,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Apply theme preference to html element
-  useEffect(() => {
-    if (!profile) return
-    const pref = profile.theme_preference
-    if (pref === 'light' || pref === 'dark') {
-      document.documentElement.setAttribute('data-theme', pref)
-    } else {
-      document.documentElement.removeAttribute('data-theme')
-    }
-  }, [profile?.theme_preference])
-
   const signOut = async () => {
     await supabase.auth.signOut()
     setUser(null)
