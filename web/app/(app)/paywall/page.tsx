@@ -73,7 +73,7 @@ export default function PaywallPage() {
   const [fastCount, setFastCount] = useState(0);
   const [badgeCount, setBadgeCount] = useState(0);
 
-  const isMember = profile?.subscription_tier === 'member';
+  const isMember = profile?.subscription_tier === 'member_pro';
 
   useEffect(() => {
     if (!profile) return;
