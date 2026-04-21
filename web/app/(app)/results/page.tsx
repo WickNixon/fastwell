@@ -774,8 +774,8 @@ export default function MePage() {
   useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
 
   const initials = profile?.first_name ? profile.first_name.charAt(0).toUpperCase() : '?';
-  const tierLabel = profile?.subscription_tier === 'member_pro' ? 'Member' : 'Pro';
-  const tierColor = profile?.subscription_tier === 'member_pro' ? '#1E8A4F' : '#E2682A';
+  const tierLabel = profile?.subscription_tier === 'member' ? 'Member' : 'Pro';
+  const tierColor = profile?.subscription_tier === 'member' ? '#1E8A4F' : '#E2682A';
   const fastCount = fasts.length;
   const avgFastHours = fastCount
     ? Math.floor(fasts.reduce((s, f) => s + (f.duration_minutes ?? 0), 0) / fastCount / 60)

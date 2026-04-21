@@ -31,8 +31,8 @@ export default function SettingsSubscriptionPage() {
   const [error, setError] = useState('');
 
   const tier = profile?.subscription_tier ?? 'free';
-  const isMember = tier === 'member_pro';
-  const isPro = tier === 'pro' || tier === 'member_pro';
+  const isMember = tier === 'member';
+  const isPro = tier === 'member' || tier === 'subscriber';
   const trialExpired = !isPro && profile?.pro_trial_ends_at
     ? new Date(profile.pro_trial_ends_at) < new Date()
     : false;

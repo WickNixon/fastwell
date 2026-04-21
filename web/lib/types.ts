@@ -10,7 +10,7 @@ export interface Profile {
   on_hrt: 'yes' | 'no' | 'not_sure' | null;
   primary_goal: 'energy' | 'sleep' | 'weight_loss' | 'hormonal_balance' | 'blood_sugar' | 'all' | null;
   theme_preference: 'system' | 'light' | 'dark';
-  subscription_tier: 'free' | 'pro' | 'member_pro';
+  subscription_tier: 'free' | 'member' | 'subscriber';
   trial_ends_at: string | null;
   trial_reminder_sent: boolean;
   pro_trial_started_at: string | null;

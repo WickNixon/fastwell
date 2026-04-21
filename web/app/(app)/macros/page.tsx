@@ -32,7 +32,7 @@ export default function MacrosPage() {
   const { user, profile } = useAuth();
   const supabase = createClient();
 
-  const isPro = profile?.subscription_tier === 'pro' || profile?.subscription_tier === 'member_pro';
+  const isPro = profile?.subscription_tier === 'member' || profile?.subscription_tier === 'subscriber';
   const trialActive = profile?.pro_trial_ends_at
     ? new Date(profile.pro_trial_ends_at) > new Date()
     : false;

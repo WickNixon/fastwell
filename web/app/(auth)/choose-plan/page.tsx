@@ -73,7 +73,7 @@ export default function ChoosePlanPage() {
   const [selected, setSelected] = useState<PlanKey>('monthly');
   const [loading, setLoading] = useState(false);
 
-  const isMember = profile?.subscription_tier === 'member_pro';
+  const isMember = profile?.subscription_tier === 'member';
 
   const getPrice = (plan: PlanDef) => isMember ? plan.memberPriceLabel : plan.priceLabel;
 

@@ -42,7 +42,7 @@ export default function UpgradeModal({ visible, onClose, context = 'general' }: 
 
   if (!visible) return null;
 
-  const isMember = profile?.subscription_tier === 'member_pro';
+  const isMember = profile?.subscription_tier === 'member';
   const plans = isMember ? MEMBER_PLANS : NON_MEMBER_PLANS;
   const selected = plans.find(p => p.key === selectedPlan)!;
   const { headline, sub } = HEADLINES[context] ?? HEADLINES.general;
