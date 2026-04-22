@@ -761,6 +761,18 @@ function GratificationSheet({
   );
 }
 
+// ─── Habit Progress Helper ────────────────────────────────────────────────────
+
+function getHabitProgress(
+  habitKey: string,
+  todayValues: Record<string, number>,
+  goalNum: number,
+): { todayValue: number; progressPercent: number; isComplete: boolean } {
+  const todayValue = todayValues[habitKey] ?? 0;
+  const progressPercent = goalNum > 0 ? Math.min((todayValue / goalNum) * 100, 100) : 0;
+  return { todayValue, progressPercent, isComplete: progressPercent >= 100 };
+}
+
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -872,8 +884,10 @@ export default function DashboardPage() {
   const fetchDayData = useCallback(async (date: string) => {
     if (!profile) return;
     try {
-      const { data: entries, error: fetchError } = await getSupabase()
-        .from('health_entries').select('*').eq('user_id', profile.id).eq('entry_date', date);
+      const [{ data: entries, error: fetchError }, { data: symptomsData }] = await Promise.all([
+        getSupabase().from('health_entries').select('*').eq('user_id', profile.id).eq('entry_date', date),
+        getSupabase().from('symptoms_log').select('id').eq('user_id', profile.id).eq('entry_date', date).limit(1),
+      ]);
       // Never clear existing state on a failed fetch — preserve optimistic updates
       if (fetchError) return;
       const entrySet = new Set<string>();
@@ -892,6 +906,11 @@ export default function DashboardPage() {
           values[e.metric] = (values[e.metric] ?? 0) + (e.value ?? 0);
         }
         if (e.emoji || e.memo) memos[e.metric] = { emoji: e.emoji ?? null, memo: e.memo ?? null };
+      }
+      // Symptoms page writes to symptoms_log (not health_entries) — detect separately
+      if ((symptomsData ?? []).length > 0) {
+        entrySet.add('symptoms');
+        values['symptoms'] = 1;
       }
       setTodayEntries(entrySet);
       setTodayChecked(checkedSet);
@@ -985,24 +1004,6 @@ export default function DashboardPage() {
   }, [profile, today, startTick, fetchDayData]);
 
   useEffect(() => { load(); }, [load]);
-
-  // Realtime subscription: re-fetch todayEntries when health_entries changes for this user today
-  useEffect(() => {
-    if (!profile) return;
-    const channel = getSupabase()
-      .channel(`health_entries_today_${profile.id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'health_entries', filter: `user_id=eq.${profile.id}` },
-        (payload) => {
-          const entryDate = (payload.new as Record<string, unknown>)?.entry_date as string | undefined
-            ?? (payload.old as Record<string, unknown>)?.entry_date as string | undefined;
-          if (entryDate === today) fetchDayData(today);
-        }
-      )
-      .subscribe();
-    return () => { getSupabase().removeChannel(channel); };
-  }, [profile, today, fetchDayData]);
 
   // Re-fetch when user returns from a tracking page (tab/app refocus)
   useEffect(() => {
@@ -1260,20 +1261,18 @@ export default function DashboardPage() {
           </div>
         )}
         {allHabits.map(habit => {
-          const done = todayChecked.has(habit.key); // true only for explicit manual ticks
           const goalStr = customGoals[habit.key] ?? habit.goal;
           const goalNum = goalToNumber(goalStr, habit.key);
-          const actualValue = todayValues[habit.key] ?? 0;
-          const progress = goalNum > 0 ? Math.min((actualValue / goalNum) * 100, 100) : 0;
+          const { progressPercent } = getHabitProgress(habit.key, todayValues, goalNum);
           const isReadOnly = selectedDate !== today;
           return (
           <HabitCard
             key={habit.key}
             habit={habit}
-            done={done}
+            done={todayChecked.has(habit.key)}
             customGoal={goalStr}
             memoEmoji={todayMemos[habit.key]}
-            progress={progress}
+            progress={progressPercent}
             onTick={() => !isReadOnly && handleTick(habit)}
             onCardTap={() => router.push(habit.href)}
             onEdit={() => !isReadOnly && setGoalEditHabit(habit)}
