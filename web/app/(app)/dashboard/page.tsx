@@ -889,6 +889,7 @@ export default function DashboardPage() {
         } else if (e.unit === 'check') {
           // Direct manual tick — metric IS the habit key, not a tracking-page metric
           checkedSet.add(e.metric);
+          values[e.metric] = (values[e.metric] ?? 0) + (e.value ?? 0);
         }
         if (e.emoji || e.memo) memos[e.metric] = { emoji: e.emoji ?? null, memo: e.memo ?? null };
       }
