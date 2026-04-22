@@ -502,7 +502,7 @@ function HabitCard({
   // State 1: 0%, not ticked  → white, no fill, empty circle
   // State 2: 1–99%, not ticked → white, partial fill, empty circle (tappable)
   // State 3: 100% OR manually ticked → full green fill, green circle
-  const effectiveDone = progress >= 100 || done;
+  const effectiveDone = progress >= 100;
   return (
     <div
       style={{
@@ -781,7 +781,8 @@ export default function DashboardPage() {
 
   // Gratification state
   const [gratification, setGratification] = useState<{ reason: 'fast' | 'habits'; badge: UserBadge | null } | null>(null);
-  const habitsCompleteTriggeredRef = useRef('');
+  const hasShownAllDoneToday = useRef(false);
+  const tickJustHappenedRef = useRef(false);
 
   // Calendar state
   const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
@@ -842,18 +843,22 @@ export default function DashboardPage() {
 
   const allHabits = [...DEFAULT_HABITS, ...customHabits];
 
-  // All habits completion detection
+  // All habits completion detection — only fires when triggered by a user tick, not on page load
   useEffect(() => {
     if (
+      tickJustHappenedRef.current &&
+      !hasShownAllDoneToday.current &&
       allHabits.length > 0 &&
-      allHabits.every(h => todayEntries.has(h.key)) &&
-      habitsCompleteTriggeredRef.current !== today
+      allHabits.every(h => todayEntries.has(h.key))
     ) {
-      habitsCompleteTriggeredRef.current = today;
+      hasShownAllDoneToday.current = true;
+      tickJustHappenedRef.current = false;
       checkBadge().then(badge => setGratification({ reason: 'habits', badge }));
+    } else {
+      tickJustHappenedRef.current = false;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todayEntries, allHabits, today]);
+  }, [todayEntries, allHabits]);
 
   const startTick = useCallback((startTime: Date) => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -1082,6 +1087,7 @@ export default function DashboardPage() {
     const currentProgress = goalNum > 0 ? Math.min((actualValue / goalNum) * 100, 100) : 0;
     if (todayChecked.has(habit.key) || currentProgress >= 100) return;
     setHabitError('');
+    tickJustHappenedRef.current = true;
     // Optimistic update immediately
     setTodayEntries(prev => new Set([...prev, habit.key]));
     setTodayChecked(prev => new Set([...prev, habit.key]));
