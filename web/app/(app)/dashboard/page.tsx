@@ -498,10 +498,11 @@ function HabitCard({
   onEdit: () => void;
   readOnly?: boolean;
 }) {
-  // State 1: progress===0 && !done  → not started
-  // State 2: 0 < progress < 100    → partial (no green tick/border, even if done=true from metric mapping)
-  // State 3: progress>=100 OR (done && progress===0) → complete (manual tick or goal met)
-  const effectiveDone = progress >= 100 || (done && progress === 0);
+  // done = explicit manual tick; progress = numeric % toward goal
+  // State 1: 0%, not ticked  → white, no fill, empty circle
+  // State 2: 1–99%, not ticked → white, partial fill, empty circle (tappable)
+  // State 3: 100% OR manually ticked → full green fill, green circle
+  const effectiveDone = progress >= 100 || done;
   return (
     <div
       style={{
@@ -516,10 +517,10 @@ function HabitCard({
       tabIndex={0}
       onKeyDown={e => e.key === 'Enter' && onCardTap()}
     >
-      {/* Progress fill layer */}
+      {/* Progress fill layer — 100% when complete, actual % when partial */}
       <div style={{
         position: 'absolute', top: 0, left: 0, height: '100%',
-        width: `${progress}%`,
+        width: `${effectiveDone ? 100 : progress}%`,
         backgroundColor: '#D9ECE0',
         transition: 'width 0.4s ease',
         zIndex: 0,
@@ -791,6 +792,7 @@ export default function DashboardPage() {
   const [customGoals, setCustomGoals] = useState<Record<string, string>>({});
   const [customHabitsDb, setCustomHabitsDb] = useState<Record<string, { goal: number; unit: string }>>({});
   const [todayEntries, setTodayEntries] = useState<Set<string>>(new Set());
+  const [todayChecked, setTodayChecked] = useState<Set<string>>(new Set()); // explicit manual ticks only
   const [todayMemos, setTodayMemos] = useState<Record<string, { emoji: string | null; memo: string | null }>>({});
   const [todayValues, setTodayValues] = useState<Record<string, number>>({});
   const [bottomSheet, setBottomSheet] = useState<HabitDef | null>(null);
@@ -870,6 +872,7 @@ export default function DashboardPage() {
       // Never clear existing state on a failed fetch — preserve optimistic updates
       if (fetchError) return;
       const entrySet = new Set<string>();
+      const checkedSet = new Set<string>(); // habit keys with explicit check entries
       const memos: Record<string, { emoji: string | null; memo: string | null }> = {};
       const values: Record<string, number> = {};
       for (const e of (entries ?? [])) {
@@ -878,10 +881,14 @@ export default function DashboardPage() {
         if (habitKey) {
           entrySet.add(habitKey);
           values[habitKey] = (values[habitKey] ?? 0) + (e.value ?? 0);
+        } else if (e.unit === 'check') {
+          // Direct manual tick — metric IS the habit key, not a tracking-page metric
+          checkedSet.add(e.metric);
         }
         if (e.emoji || e.memo) memos[e.metric] = { emoji: e.emoji ?? null, memo: e.memo ?? null };
       }
       setTodayEntries(entrySet);
+      setTodayChecked(checkedSet);
       setTodayMemos(memos);
       setTodayValues(values);
     } catch {}
@@ -1067,10 +1074,17 @@ export default function DashboardPage() {
   };
 
   const handleTick = async (habit: HabitDef) => {
-    if (todayEntries.has(habit.key) || !user) return;
+    if (!user) return;
+    // Block if already manually ticked or numerically complete
+    const goalStr = customGoals[habit.key] ?? habit.goal;
+    const goalNum = goalToNumber(goalStr, habit.key);
+    const actualValue = todayValues[habit.key] ?? 0;
+    const currentProgress = goalNum > 0 ? Math.min((actualValue / goalNum) * 100, 100) : 0;
+    if (todayChecked.has(habit.key) || currentProgress >= 100) return;
     setHabitError('');
     // Optimistic update immediately
     setTodayEntries(prev => new Set([...prev, habit.key]));
+    setTodayChecked(prev => new Set([...prev, habit.key]));
     setCompletedDates(prev => new Set([...prev, today]));
     // Save to Supabase immediately — don't wait for memo
     const { error } = await supabase.from('health_entries').upsert({
@@ -1086,6 +1100,7 @@ export default function DashboardPage() {
       setHabitError(error.message);
       // Revert optimistic update
       setTodayEntries(prev => { const next = new Set(prev); next.delete(habit.key); return next; });
+      setTodayChecked(prev => { const next = new Set(prev); next.delete(habit.key); return next; });
       return;
     }
     // Re-fetch from Supabase so state is authoritative, not just optimistic
@@ -1238,7 +1253,7 @@ export default function DashboardPage() {
           </div>
         )}
         {allHabits.map(habit => {
-          const done = todayEntries.has(habit.key);
+          const done = todayChecked.has(habit.key); // true only for explicit manual ticks
           const goalStr = customGoals[habit.key] ?? habit.goal;
           const goalNum = goalToNumber(goalStr, habit.key);
           const actualValue = todayValues[habit.key] ?? 0;
