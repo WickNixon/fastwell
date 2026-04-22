@@ -1239,7 +1239,7 @@ export default function DashboardPage() {
           const goalStr = customGoals[habit.key] ?? habit.goal;
           const goalNum = goalToNumber(goalStr, habit.key);
           const actualValue = todayValues[habit.key] ?? 0;
-          const progress = done ? 100 : (goalNum > 0 ? Math.min((actualValue / goalNum) * 100, 100) : 0);
+          const progress = goalNum > 0 ? Math.min((actualValue / goalNum) * 100, 100) : 0;
           const isReadOnly = selectedDate !== today;
           return (
           <HabitCard
