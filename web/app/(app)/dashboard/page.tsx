@@ -862,8 +862,10 @@ export default function DashboardPage() {
   const fetchDayData = useCallback(async (date: string) => {
     if (!profile) return;
     try {
-      const { data: entries } = await getSupabase()
-        .from('health_entries').select('metric, value, memo, emoji').eq('user_id', profile.id).eq('entry_date', date);
+      const { data: entries, error: fetchError } = await getSupabase()
+        .from('health_entries').select('*').eq('user_id', profile.id).eq('entry_date', date);
+      // Never clear existing state on a failed fetch — preserve optimistic updates
+      if (fetchError) return;
       const entrySet = new Set<string>();
       const memos: Record<string, { emoji: string | null; memo: string | null }> = {};
       const values: Record<string, number> = {};
