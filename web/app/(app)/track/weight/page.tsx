@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
+import HabitHistoryRow from '@/app/components/HabitHistoryRow';
 import type { HealthEntry } from '@/lib/types';
 
 function getTodayNZ() {
@@ -59,6 +60,21 @@ export default function TrackWeightPage() {
     setSaving(false);
   };
 
+  const handleDelete = async (id: string) => {
+    if (!user) return;
+    const { error } = await supabase.from('health_entries').delete().eq('id', id).eq('user_id', user.id);
+    if (error) {
+      setFeedback({ ok: false, msg: error.message });
+      return;
+    }
+    setFeedback({ ok: true, msg: 'Deleted' });
+    setTimeout(() => setFeedback(null), 1500);
+    const { data } = await supabase
+      .from('health_entries').select('*').eq('user_id', user.id).eq('metric', 'weight')
+      .order('entry_date', { ascending: false }).limit(10);
+    setHistory(data ?? []);
+  };
+
   return (
     <div className="page page-top">
       <button onClick={() => router.back()} style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Lato, sans-serif' }}>
@@ -104,15 +120,13 @@ export default function TrackWeightPage() {
           <p className="section-label mb-12">Recent readings</p>
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             {history.map((e, i) => (
-              <div key={e.id} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '13px 16px',
-                borderBottom: i < history.length - 1 ? '1px solid var(--border)' : 'none',
-              }}>
-                <p className="body-sm">{new Date(e.entry_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}</p>
-                <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>
-                  {e.value} {e.unit}
-                </p>
+              <div key={e.id} style={{ borderBottom: i < history.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                <HabitHistoryRow
+                  id={e.id}
+                  dateLabel={new Date(e.entry_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}
+                  valueLabel={`${e.value} ${e.unit}`}
+                  onDelete={handleDelete}
+                />
               </div>
             ))}
           </div>

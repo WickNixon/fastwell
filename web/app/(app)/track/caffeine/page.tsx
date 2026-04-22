@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
+import HabitHistoryRow from '@/app/components/HabitHistoryRow';
 
 const HABIT_KEY = 'caffeine_drinks';
 
@@ -61,6 +62,18 @@ export default function TrackCaffeinePage() {
       setTimeout(() => setFeedback(null), 1500);
     }
     setSaving(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!user) return;
+    const { error } = await supabase.from('health_entries').delete().eq('id', id).eq('user_id', user.id);
+    if (error) {
+      setFeedback({ ok: false, msg: error.message });
+      return;
+    }
+    setFeedback({ ok: true, msg: 'Deleted' });
+    setTimeout(() => setFeedback(null), 1500);
+    await load();
   };
 
   return (
@@ -128,17 +141,13 @@ export default function TrackCaffeinePage() {
           <p className="section-label mb-12">Last 7 days</p>
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             {history.map((e, i) => (
-              <div key={e.id} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '13px 16px', borderBottom: i < history.length - 1 ? '1px solid var(--border)' : 'none',
-              }}>
-                <div>
-                  <p className="body-sm">{new Date(e.entry_date).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
-                  {e.memo && <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', marginTop: 2 }}>{e.memo}</p>}
-                </div>
-                <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 15, color: 'var(--primary)' }}>
-                  {e.value} {e.value === 1 ? 'cup' : 'cups'}
-                </p>
+              <div key={e.id} style={{ borderBottom: i < history.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                <HabitHistoryRow
+                  id={e.id}
+                  dateLabel={`${new Date(e.entry_date).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })}${e.memo ? ` — ${e.memo}` : ''}`}
+                  valueLabel={`${e.value} ${e.value === 1 ? 'cup' : 'cups'}`}
+                  onDelete={handleDelete}
+                />
               </div>
             ))}
           </div>

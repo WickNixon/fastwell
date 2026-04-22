@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
+import HabitHistoryRow from '@/app/components/HabitHistoryRow';
 
 const HABIT_KEY = 'day_review';
 const MOOD_LABELS = ['', 'Tough day', 'Hard', 'Okay', 'Good', 'Great day'];
@@ -60,6 +61,18 @@ export default function TrackReviewPage() {
       setTimeout(() => setFeedback(null), 1500);
     }
     setSaving(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!user) return;
+    const { error } = await supabase.from('health_entries').delete().eq('id', id).eq('user_id', user.id);
+    if (error) {
+      setFeedback({ ok: false, msg: error.message });
+      return;
+    }
+    setFeedback({ ok: true, msg: 'Deleted' });
+    setTimeout(() => setFeedback(null), 1500);
+    await load();
   };
 
   return (
@@ -125,14 +138,16 @@ export default function TrackReviewPage() {
           <p className="section-label mb-12">Recent reviews</p>
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             {history.map((e, i) => (
-              <div key={e.id} style={{
-                padding: '13px 16px', borderBottom: i < history.length - 1 ? '1px solid var(--border)' : 'none',
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: e.memo ? 4 : 0 }}>
-                  <p className="body-sm">{new Date(e.entry_date).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
-                  {e.value && <p style={{ fontSize: 14 }}>{'⭐'.repeat(e.value)}</p>}
-                </div>
-                {e.memo && <p style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', lineHeight: 1.5 }}>{e.memo}</p>}
+              <div key={e.id} style={{ borderBottom: i < history.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                <HabitHistoryRow
+                  id={e.id}
+                  dateLabel={new Date(e.entry_date).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  valueLabel={e.value ? '⭐'.repeat(e.value) : e.memo ? '✓' : '—'}
+                  onDelete={handleDelete}
+                />
+                {e.memo && (
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', lineHeight: 1.5, padding: '0 16px 10px' }}>{e.memo}</p>
+                )}
               </div>
             ))}
           </div>

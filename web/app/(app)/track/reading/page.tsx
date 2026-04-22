@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
+import HabitHistoryRow from '@/app/components/HabitHistoryRow';
 
 const HABIT_KEY = 'reading_minutes';
 const DEFAULT_GOAL = 20;
@@ -73,6 +74,18 @@ export default function TrackReadingPage() {
       setTimeout(() => setFeedback(null), 1500);
     }
     setSaving(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!user) return;
+    const { error } = await supabase.from('health_entries').delete().eq('id', id).eq('user_id', user.id);
+    if (error) {
+      setFeedback({ ok: false, msg: error.message });
+      return;
+    }
+    setFeedback({ ok: true, msg: 'Deleted' });
+    setTimeout(() => setFeedback(null), 1500);
+    await load();
   };
 
   const saveGoal = async (newGoal: number) => {
@@ -151,12 +164,13 @@ export default function TrackReadingPage() {
           <p className="section-label mb-12">Last 7 days</p>
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             {history.map((e, i) => (
-              <div key={e.id} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '13px 16px', borderBottom: i < history.length - 1 ? '1px solid var(--border)' : 'none',
-              }}>
-                <p className="body-sm">{new Date(e.entry_date).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
-                <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 15, color: 'var(--primary)' }}>{e.value} mins</p>
+              <div key={e.id} style={{ borderBottom: i < history.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                <HabitHistoryRow
+                  id={e.id}
+                  dateLabel={new Date(e.entry_date).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  valueLabel={`${e.value} mins`}
+                  onDelete={handleDelete}
+                />
               </div>
             ))}
           </div>
