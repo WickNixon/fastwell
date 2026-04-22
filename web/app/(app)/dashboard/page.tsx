@@ -968,6 +968,24 @@ export default function DashboardPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Realtime subscription: re-fetch todayEntries when health_entries changes for this user today
+  useEffect(() => {
+    if (!profile) return;
+    const channel = getSupabase()
+      .channel(`health_entries_today_${profile.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'health_entries', filter: `user_id=eq.${profile.id}` },
+        (payload) => {
+          const entryDate = (payload.new as Record<string, unknown>)?.entry_date as string | undefined
+            ?? (payload.old as Record<string, unknown>)?.entry_date as string | undefined;
+          if (entryDate === today) fetchDayData(today);
+        }
+      )
+      .subscribe();
+    return () => { getSupabase().removeChannel(channel); };
+  }, [profile, today, fetchDayData]);
+
   // Re-fetch when user returns from a tracking page (tab/app refocus)
   useEffect(() => {
     const onVisible = () => {
@@ -1065,6 +1083,8 @@ export default function DashboardPage() {
       setTodayEntries(prev => { const next = new Set(prev); next.delete(habit.key); return next; });
       return;
     }
+    // Re-fetch from Supabase so state is authoritative, not just optimistic
+    await fetchDayData(today);
     // Open memo sheet for optional emoji/note enrichment
     setBottomSheet(habit);
   };
