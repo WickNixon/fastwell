@@ -73,9 +73,9 @@ function goalToNumber(goal: string | undefined, habitKey: string): number {
   const defaults: Record<string, number> = {
     water: 2000, exercise: 30, sleep: 8, walking: 10000, meditation: 10, reading: 20,
   };
-  if (!goal) return defaults[habitKey] ?? 0;
+  if (!goal) return defaults[habitKey] ?? 1;
   const match = goal.replace(/,/g, '').match(/[\d]+(?:\.\d+)?/);
-  return match ? parseFloat(match[0]) : (defaults[habitKey] ?? 0);
+  return match ? parseFloat(match[0]) : (defaults[habitKey] ?? 1);
 }
 const PROTOCOLS = ['17h', '24h', 'Custom'];
 const PROTOCOL_HOURS: Record<string, number> = { '17h': 17, '24h': 24 };
