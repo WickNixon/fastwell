@@ -498,7 +498,10 @@ function HabitCard({
   onEdit: () => void;
   readOnly?: boolean;
 }) {
-  const effectiveDone = done || progress >= 100;
+  // State 1: progress===0 && !done  → not started
+  // State 2: 0 < progress < 100    → partial (no green tick/border, even if done=true from metric mapping)
+  // State 3: progress>=100 OR (done && progress===0) → complete (manual tick or goal met)
+  const effectiveDone = progress >= 100 || (done && progress === 0);
   return (
     <div
       style={{
