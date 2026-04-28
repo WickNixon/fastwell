@@ -34,6 +34,9 @@ export interface FastingSession {
   started_at: string;
   ended_at: string | null;
   duration_minutes: number | null;
+  duration_hours?: number | null;
+  status?: string | null;
+  mood?: string | null;
   notes: string | null;
   completion_celebrated: boolean | null;
   created_at: string;

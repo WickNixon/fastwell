@@ -113,6 +113,18 @@ export default function FastingTimerPage() {
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [showGlucoseSheet, setShowGlucoseSheet] = useState(false);
   const [showKetonesSheet, setShowKetonesSheet] = useState(false);
+
+  const handleMoodSelect = async (moodKey: string) => {
+    const newMood = selectedMood === moodKey ? null : moodKey;
+    setSelectedMood(newMood);
+    if (!activeFast) return;
+    const { error } = await getSupabase()
+      .from('fasting_sessions')
+      .update({ mood: newMood })
+      .eq('id', activeFast.id)
+      .eq('user_id', activeFast.user_id);
+    if (error) console.error('Mood save error:', error);
+  };
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startTick = useCallback((startTime: Date) => {
@@ -335,7 +347,7 @@ export default function FastingTimerPage() {
               return (
                 <div key={mood.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
                   <button
-                    onClick={() => setSelectedMood(isSelected ? null : mood.key)}
+                    onClick={() => handleMoodSelect(mood.key)}
                     style={{
                       width: 36, height: 36, borderRadius: 18,
                       backgroundColor: isSelected ? '#FFFFFF' : 'rgba(255,255,255,0.12)',

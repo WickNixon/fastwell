@@ -327,6 +327,7 @@ function FastingCard({
   starting: boolean;
   userId?: string;
 }) {
+  const router = useRouter();
   const [showSheet, setShowSheet] = useState(false);
   const [showGlucoseSheet, setShowGlucoseSheet] = useState(false);
   const [showKetonesSheet, setShowKetonesSheet] = useState(false);
@@ -365,11 +366,15 @@ function FastingCard({
     const offset = CIRC * (1 - progress);
     const protocolLabel = (activeFast.protocol ?? '17h').toUpperCase();
     return (
-      <div style={{
-        backgroundColor: 'var(--surface)', borderRadius: 20,
-        boxShadow: '0 6px 18px rgba(30,138,79,0.08), 0 1px 2px rgba(0,0,0,0.04)',
-        padding: '16px 16px 14px', marginBottom: 16, position: 'relative',
-      }}>
+      <div
+        onClick={() => router.push('/fasting/timer')}
+        style={{
+          backgroundColor: 'var(--surface)', borderRadius: 20,
+          boxShadow: '0 6px 18px rgba(30,138,79,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+          padding: '16px 16px 14px', marginBottom: 16, position: 'relative',
+          cursor: 'pointer',
+        }}
+      >
         {/* Top label */}
         <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 11, color: '#1E8A4F', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>
           {protocolLabel} FAST · IN PROGRESS
@@ -399,7 +404,7 @@ function FastingCard({
           {/* Right: Log pills */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <button
-              onClick={() => setShowGlucoseSheet(true)}
+              onClick={(e) => { e.stopPropagation(); setShowGlucoseSheet(true); }}
               style={{
                 height: 32, borderRadius: 8, border: '1px solid #E8E4D9',
                 backgroundColor: 'white', cursor: 'pointer', padding: '0 10px',
@@ -410,7 +415,7 @@ function FastingCard({
               🩸 Log glucose
             </button>
             <button
-              onClick={() => setShowKetonesSheet(true)}
+              onClick={(e) => { e.stopPropagation(); setShowKetonesSheet(true); }}
               style={{
                 height: 32, borderRadius: 8, border: '1px solid #E8E4D9',
                 backgroundColor: 'white', cursor: 'pointer', padding: '0 10px',
@@ -426,7 +431,7 @@ function FastingCard({
         {/* End fast text link */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
           <button
-            onClick={onEnd}
+            onClick={(e) => { e.stopPropagation(); onEnd(); }}
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Lato, sans-serif', fontSize: 12, color: '#6B7066', textDecoration: 'underline', padding: 0 }}
           >
             End fast
