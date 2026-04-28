@@ -223,30 +223,33 @@ export default function FastingTimerPage() {
     setConfirm(false);
     if (intervalRef.current) clearInterval(intervalRef.current);
     const sessionId = activeFast.id;
+    const endedAt = new Date().toISOString();
+    const durationMins = Math.floor(elapsed / 60);
+    const durationHrs = elapsed / 3600;
     const { error: err } = await getSupabase()
       .from('fasting_sessions')
-      .update({ ended_at: new Date().toISOString(), duration_minutes: Math.floor(elapsed / 60), completion_celebrated: true })
-      .eq('id', sessionId);
-    if (err) { setError(err.message); startTick(new Date(activeFast.started_at)); return; }
+      .update({
+        ended_at: endedAt,
+        status: 'complete',
+        duration_minutes: durationMins,
+        duration_hours: durationHrs,
+        completion_celebrated: true,
+      })
+      .eq('id', sessionId)
+      .eq('user_id', activeFast.user_id);
+    if (err) {
+      console.error('End fast error:', err);
+      setError(err.message);
+      startTick(new Date(activeFast.started_at));
+      return;
+    }
     try { localStorage.removeItem(FAST_KEY); } catch {}
-    setActiveFast(null);
-    setElapsed(0);
-    try {
-      const key = `fastwell_fast_popup_${sessionId}`;
-      if (localStorage.getItem(key)) return;
-      localStorage.setItem(key, '1');
-    } catch {}
     try {
       if (profile) {
         await checkAndAwardBadges(profile.id);
-        const { data: badge } = await getSupabase()
-          .from('user_badges').select('*').eq('user_id', profile.id).eq('seen', false)
-          .order('earned_at', { ascending: false }).limit(1).maybeSingle();
-        setGratification({ badge: (badge as UserBadge) ?? null });
-      } else {
-        setGratification({ badge: null });
       }
-    } catch { setGratification({ badge: null }); }
+    } catch {}
+    router.push('/dashboard');
   };
 
   const collectBadge = async () => {
@@ -416,18 +419,71 @@ export default function FastingTimerPage() {
           End my fast
         </button>
 
-        {/* Confirm end dialog */}
+        {/* F03 — End my fast confirmation sheet */}
         {confirm && (
-          <div className="confirm-dialog">
-            <div className="confirm-box">
-              <p className="h3 mb-8">End your fast?</p>
-              <p className="body-sm mb-16">You can always start a new one when you&apos;re ready.</p>
-              <div className="confirm-actions">
-                <button className="btn btn-outline btn-sm flex-1" onClick={() => setConfirm(false)}>Keep going.</button>
-                <button className="btn btn-primary btn-sm flex-1" onClick={breakFast}>Yes, end my fast.</button>
+          <>
+            {/* Backdrop */}
+            <div
+              onClick={() => setConfirm(false)}
+              style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 100 }}
+            />
+            {/* Sheet */}
+            <div style={{
+              position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 101,
+              backgroundColor: '#FFFFFF',
+              borderTopLeftRadius: 24, borderTopRightRadius: 24,
+              padding: '0 20px 40px',
+              maxWidth: 480, margin: '0 auto',
+            }}>
+              {/* Drag handle */}
+              <div style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: '#E8E4D9', margin: '12px auto 0' }} />
+
+              <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 22, color: '#1A1A1A', textAlign: 'center', marginTop: 10 }}>
+                End your fast?
+              </p>
+              <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: '#6B7066', textAlign: 'center', lineHeight: 1.4, marginTop: 8 }}>
+                You&apos;re {Math.floor(elapsed / 3600)}h {Math.floor((elapsed % 3600) / 60)}m in. You can always start a new one when you&apos;re ready.
+              </p>
+
+              {/* Duration card */}
+              <div style={{
+                marginTop: 16, backgroundColor: '#D9ECE0', borderRadius: 16,
+                border: '1px solid #A9D7BB', height: 80,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 24, color: '#1E8A4F' }}>
+                  {Math.floor(elapsed / 3600)}h {Math.floor((elapsed % 3600) / 60)}m
+                </p>
+                <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 12, color: '#6B7066', marginTop: 2 }}>
+                  of your {goalHours}-hour goal
+                </p>
               </div>
+
+              {/* Yes, end my fast */}
+              <button
+                onClick={breakFast}
+                style={{
+                  marginTop: 18, width: '100%', height: 56, borderRadius: 28,
+                  backgroundColor: '#1E8A4F', border: 'none', cursor: 'pointer',
+                  fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 16, color: '#FFFFFF',
+                }}
+              >
+                Yes, end my fast.
+              </button>
+
+              {/* Keep going */}
+              <button
+                onClick={() => setConfirm(false)}
+                style={{
+                  marginTop: 10, width: '100%', height: 52, borderRadius: 26,
+                  backgroundColor: '#FFFFFF', border: '1px solid #E8E4D9', cursor: 'pointer',
+                  fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 15, color: '#1A1A1A',
+                }}
+              >
+                Keep going.
+              </button>
             </div>
-          </div>
+          </>
         )}
 
         {/* Gratification sheet */}

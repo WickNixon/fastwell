@@ -341,19 +341,33 @@ function FastingCard({
         ? Math.floor((new Date(completedFast.ended_at).getTime() - new Date(completedFast.started_at).getTime()) / 60000)
         : 0);
     const h = Math.floor(durationMins / 60);
-    const m = durationMins % 60;
+    const completedAtLabel = completedFast.ended_at
+      ? new Date(completedFast.ended_at).toLocaleTimeString('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', minute: '2-digit', hour12: true })
+      : '';
+    const goalH = getGoalHours(completedFast.protocol ?? '17h', 17);
     return (
-      <div style={{ backgroundColor: 'var(--surface)', border: '1.5px solid var(--primary)', borderRadius: 16, padding: '20px 20px 24px', marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14, color: 'var(--text-muted)' }}>🕐 Fasting</span>
-          <span style={{ fontSize: 11, fontFamily: 'Montserrat, sans-serif', fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-pale)', padding: '2px 8px', borderRadius: 10 }}>✓ Complete</span>
+      <div style={{ backgroundColor: '#D9ECE0', border: '1.5px solid #A9D7BB', borderRadius: 16, padding: '16px 20px 20px', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+          {/* Green checkmark circle */}
+          <div style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#1E8A4F', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M3 8l3.5 3.5L13 5" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <div>
+            <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14, color: '#1E8A4F' }}>
+              {h}h fast complete
+            </p>
+            {completedAtLabel && (
+              <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: '#6B7066', marginTop: 2 }}>
+                Completed at {completedAtLabel}
+              </p>
+            )}
+          </div>
+          <p style={{ marginLeft: 'auto', fontFamily: 'Lato, sans-serif', fontSize: 12, color: '#6B7066' }}>
+            {goalH}h goal
+          </p>
         </div>
-        <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 34, color: 'var(--primary)', marginBottom: 4 }}>
-          {h}h {m}m
-        </p>
-        <p style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', marginBottom: 20 }}>
-          {completedFast.protocol ?? 'Fast'} completed. Well done.
-        </p>
         <button className="btn btn-primary" onClick={onStartNew} style={{ width: '100%' }}>Start a new fast</button>
       </div>
     );
