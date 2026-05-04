@@ -166,6 +166,7 @@ export default function FastingTimerPage() {
             localStorage.setItem(FAST_KEY, JSON.stringify({ sessionId: data.id, startedAt: data.started_at, protocol: data.protocol, goalHours: getGoalHours(data.protocol ?? '17h', 17) } satisfies StoredFast));
           } catch {}
           setActiveFast(data);
+          setSelectedMood(data.mood ?? null);
           startTick(new Date(data.started_at));
         } else {
           try {
