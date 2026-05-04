@@ -13,6 +13,33 @@ interface FoodLog {
   notes: string | null; logged_at: string;
 }
 
+interface MealItem {
+  name: string;
+  grams: number;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  fibre_g: number;
+  confidence: 'high' | 'medium' | 'low';
+  alternatives: string[];
+}
+
+interface AnalysisResult {
+  items: MealItem[];
+  overall_confidence: 'high' | 'medium' | 'low';
+  notes: string;
+}
+
+interface CorrectionEvent {
+  type: 'item_swap' | 'describe' | 'manual_edit';
+  oldName?: string;
+  newName?: string;
+  userText?: string;
+  at: string;
+}
+
+// Legacy flat shape — kept for the existing UI in this commit; replaced in Commit 3
 interface MacroResult {
   meal_name?: string; calories?: number; protein_g?: number; carbs_g?: number;
   fat_g?: number; fibre_g?: number; confidence?: string; notes?: string; error?: string;
@@ -47,6 +74,8 @@ export default function MacrosPage() {
   const [mediaType, setMediaType] = useState('image/jpeg');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [result, setResult] = useState<MacroResult | null>(null);
+  const [originalResult, setOriginalResult] = useState<AnalysisResult | null>(null);
+  const [corrections, setCorrections] = useState<CorrectionEvent[]>([]);
   const [saving, setSaving] = useState(false);
   const [todayLogs, setTodayLogs] = useState<FoodLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
@@ -88,6 +117,8 @@ export default function MacrosPage() {
       setImageBase64(data);
       setImagePreview(dataUrl);
       setResult(null);
+      setOriginalResult(null);
+      setCorrections([]);
       setAnalyzing(true);
     };
     reader.readAsDataURL(file);
@@ -105,6 +136,9 @@ export default function MacrosPage() {
         });
         const data = await res.json();
         setResult(data);
+        if (!data.error && Array.isArray(data.items)) {
+          setOriginalResult(data as AnalysisResult);
+        }
       } catch {
         setResult({ error: 'Analysis failed — try a clearer photo' });
       }
@@ -126,12 +160,32 @@ export default function MacrosPage() {
       } catch {}
     }
     try {
+      // currentResult is the latest analysis response (same as original when no corrections applied)
+      const currentResult = originalResult ?? (result as unknown as AnalysisResult);
+      const mealName = currentResult?.items?.map(i => i.name).join(', ') ?? result.meal_name ?? 'Meal';
+      const totalCalories = currentResult?.items?.reduce((s, i) => s + i.calories, 0) ?? result.calories ?? null;
+      const totalProtein = currentResult?.items?.reduce((s, i) => s + i.protein_g, 0) ?? result.protein_g ?? null;
+      const totalCarbs = currentResult?.items?.reduce((s, i) => s + i.carbs_g, 0) ?? result.carbs_g ?? null;
+      const totalFat = currentResult?.items?.reduce((s, i) => s + i.fat_g, 0) ?? result.fat_g ?? null;
+      const totalFibre = currentResult?.items?.reduce((s, i) => s + i.fibre_g, 0) ?? result.fibre_g ?? null;
+
       await supabase.from('food_logs').insert({
-        user_id: user.id, meal_name: result.meal_name, image_url: imageUrl,
-        calories: result.calories, protein_g: result.protein_g, carbs_g: result.carbs_g,
-        fat_g: result.fat_g, fibre_g: result.fibre_g, confidence: result.confidence, notes: result.notes,
+        user_id: user.id,
+        meal_name: mealName,
+        image_url: imageUrl,
+        calories: totalCalories,
+        protein_g: totalProtein,
+        carbs_g: totalCarbs,
+        fat_g: totalFat,
+        fibre_g: totalFibre,
+        confidence: currentResult?.overall_confidence ?? result.confidence ?? null,
+        notes: currentResult?.notes ?? result.notes ?? null,
+        ai_original_payload: originalResult ?? null,
+        ai_corrections: corrections,
+        final_payload: currentResult ?? null,
       });
       setResult(null); setImageBase64(null); setImagePreview(null);
+      setOriginalResult(null); setCorrections([]);
       await loadTodayLogs();
       if (user) checkAndAwardBadges(user.id).catch(() => {});
     } catch {}
@@ -140,6 +194,7 @@ export default function MacrosPage() {
 
   const reset = () => {
     setResult(null); setImageBase64(null); setImagePreview(null); setAnalyzing(false);
+    setOriginalResult(null); setCorrections([]);
   };
 
   const openEditManual = () => {
@@ -165,20 +220,52 @@ export default function MacrosPage() {
       } catch {}
     }
     try {
+      const manualCalories = editCalories ? parseFloat(editCalories) : null;
+      const manualProtein  = editProtein  ? parseFloat(editProtein)  : null;
+      const manualCarbs    = editCarbs    ? parseFloat(editCarbs)    : null;
+      const manualFat      = editFat      ? parseFloat(editFat)      : null;
+      const manualFibre    = editFibre    ? parseFloat(editFibre)    : null;
+      const manualName     = editName || 'Meal';
+
+      const manualFinalPayload: AnalysisResult = {
+        items: [{
+          name: manualName,
+          grams: 0,
+          calories: manualCalories ?? 0,
+          protein_g: manualProtein ?? 0,
+          carbs_g: manualCarbs ?? 0,
+          fat_g: manualFat ?? 0,
+          fibre_g: manualFibre ?? 0,
+          confidence: 'manual' as unknown as 'low',
+          alternatives: [],
+        }],
+        overall_confidence: 'manual' as unknown as 'low',
+        notes: '',
+      };
+
+      const manualCorrections: CorrectionEvent[] = [
+        ...corrections,
+        { type: 'manual_edit', at: new Date().toISOString() },
+      ];
+
       await supabase.from('food_logs').insert({
         user_id: user.id,
-        meal_name: editName || result?.meal_name || 'Meal',
+        meal_name: manualName,
         image_url: imageUrl,
-        calories: editCalories ? parseFloat(editCalories) : result?.calories ?? null,
-        protein_g: editProtein ? parseFloat(editProtein) : result?.protein_g ?? null,
-        carbs_g: editCarbs ? parseFloat(editCarbs) : result?.carbs_g ?? null,
-        fat_g: editFat ? parseFloat(editFat) : result?.fat_g ?? null,
-        fibre_g: editFibre ? parseFloat(editFibre) : result?.fibre_g ?? null,
+        calories: manualCalories,
+        protein_g: manualProtein,
+        carbs_g: manualCarbs,
+        fat_g: manualFat,
+        fibre_g: manualFibre,
         confidence: 'manual',
-        notes: result?.notes ?? null,
+        notes: null,
+        ai_original_payload: originalResult ?? null,
+        ai_corrections: manualCorrections,
+        final_payload: manualFinalPayload,
       });
       setShowEditManual(false);
       setResult(null); setImageBase64(null); setImagePreview(null);
+      setOriginalResult(null); setCorrections([]);
       await loadTodayLogs();
       checkAndAwardBadges(user.id).catch(() => {});
     } catch {}
