@@ -290,18 +290,15 @@ export default function FastingTimerPage() {
 
     return (
       <div style={{
-        minHeight: '100vh',
+        height: '100dvh',
         backgroundColor: '#1E8A4F',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: '0 24px 40px',
+        overflow: 'hidden',
         maxWidth: 480,
         margin: '0 auto',
         position: 'relative',
       }}>
-        {/* Top bar */}
-        <div style={{ width: '100%', display: 'flex', alignItems: 'center', paddingTop: 20, marginBottom: 24 }}>
+        {/* Top bar — absolute so it overlays without consuming flex space */}
+        <div style={{ position: 'absolute', top: 56, left: 20, right: 20, display: 'flex', alignItems: 'center' }}>
           <button
             onClick={() => router.back()}
             style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF', fontSize: 20, flexShrink: 0 }}
@@ -315,109 +312,127 @@ export default function FastingTimerPage() {
           <div style={{ width: 36 }} />
         </div>
 
-        {/* Progress ring */}
-        <div style={{ position: 'relative', width: 260, height: 260, marginBottom: 32 }}>
-          <svg width="260" height="260" viewBox="0 0 260 260" style={{ transform: 'rotate(-90deg)' }}>
-            <circle cx="130" cy="130" r={R} fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="12" />
-            <circle
-              cx="130" cy="130" r={R} fill="none"
-              stroke="#E2682A" strokeWidth="12"
-              strokeDasharray={CIRC}
-              strokeDashoffset={offset}
-              strokeLinecap="round"
-              style={{ transition: 'stroke-dashoffset 1s linear' }}
-            />
-          </svg>
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 40, color: '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1 }}>
-              {formatTime(remaining)}
-            </p>
-            <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>remaining</p>
-            <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 10, color: 'rgba(255,255,255,0.6)', letterSpacing: '0.18em', textTransform: 'uppercase', marginTop: 12 }}>
-              STARTED {startedLabel}
-            </p>
+        {/* Main content stack — flex column fills viewport, space-between distributes sections */}
+        <div style={{
+          position: 'relative',
+          paddingTop: 110,
+          paddingBottom: 96,
+          paddingLeft: 20,
+          paddingRight: 20,
+          height: '100%',
+          boxSizing: 'border-box',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          {/* 1. Progress ring */}
+          <div style={{ position: 'relative', width: 260, height: 260 }}>
+            <svg width="260" height="260" viewBox="0 0 260 260" style={{ transform: 'rotate(-90deg)' }}>
+              <circle cx="130" cy="130" r={R} fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="12" />
+              <circle
+                cx="130" cy="130" r={R} fill="none"
+                stroke="#E2682A" strokeWidth="12"
+                strokeDasharray={CIRC}
+                strokeDashoffset={offset}
+                strokeLinecap="round"
+                style={{ transition: 'stroke-dashoffset 1s linear' }}
+              />
+            </svg>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 40, color: '#FFFFFF', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                {formatTime(remaining)}
+              </p>
+              <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>remaining</p>
+              <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 10, color: 'rgba(255,255,255,0.6)', letterSpacing: '0.18em', textTransform: 'uppercase', marginTop: 12 }}>
+                STARTED {startedLabel}
+              </p>
+            </div>
+          </div>
+
+          {/* 2. Mood + log buttons grouped — flex centres them between ring and end button */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22, width: '100%' }}>
+            {/* How are you feeling? */}
+            <div style={{ width: '100%' }}>
+              <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 15, color: 'rgba(255,255,255,0.85)', textAlign: 'center', marginBottom: 12 }}>
+                How are you feeling?
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+                {MOOD_OPTIONS.map(mood => {
+                  const isSelected = selectedMood === mood.key;
+                  return (
+                    <div key={mood.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+                      <button
+                        onClick={() => handleMoodSelect(mood.key)}
+                        style={{
+                          width: 36, height: 36, borderRadius: 18,
+                          backgroundColor: isSelected ? '#FFFFFF' : 'rgba(255,255,255,0.12)',
+                          border: `1px solid ${isSelected ? '#FFFFFF' : 'rgba(255,255,255,0.3)'}`,
+                          cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 11,
+                          color: isSelected ? '#1E8A4F' : 'transparent',
+                        }}
+                      >
+                        {isSelected ? '✓' : ''}
+                      </button>
+                      <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 9, color: 'rgba(255,255,255,0.65)', letterSpacing: '0.1em', textTransform: 'uppercase', textAlign: 'center', maxWidth: 48 }}>
+                        {mood.label}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Log glucose / Log ketones */}
+            <div style={{ display: 'flex', gap: 12, width: '100%' }}>
+              <button
+                onClick={() => setShowGlucoseSheet(true)}
+                style={{
+                  flex: 1, height: 40, borderRadius: 12, paddingLeft: 16, paddingRight: 16,
+                  backgroundColor: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)',
+                  cursor: 'pointer',
+                  fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13, color: '#FFFFFF',
+                }}
+              >
+                🩸 Log glucose
+              </button>
+              <button
+                onClick={() => setShowKetonesSheet(true)}
+                style={{
+                  flex: 1, height: 40, borderRadius: 12, paddingLeft: 16, paddingRight: 16,
+                  backgroundColor: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)',
+                  cursor: 'pointer',
+                  fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13, color: '#FFFFFF',
+                }}
+              >
+                🔥 Log ketones
+              </button>
+            </div>
+          </div>
+
+          {/* 3. End my fast — flex pushes it to the bottom of the visible area */}
+          <div style={{ width: '100%' }}>
+            {error && (
+              <p style={{ color: '#FFCDD2', fontFamily: 'Lato, sans-serif', fontSize: 14, marginBottom: 12, textAlign: 'center' }}>{error}</p>
+            )}
+            <button
+              onClick={() => setConfirm(true)}
+              style={{
+                height: 48, borderRadius: 24,
+                backgroundColor: 'rgba(255,255,255,0.18)',
+                border: '1px solid rgba(255,255,255,0.35)',
+                color: '#FFFFFF',
+                fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 15,
+                cursor: 'pointer',
+                width: '100%',
+              }}
+            >
+              End my fast
+            </button>
           </div>
         </div>
-
-        {/* How are you feeling? */}
-        <div style={{ width: '100%', marginBottom: 20 }}>
-          <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 15, color: 'rgba(255,255,255,0.85)', textAlign: 'center', marginBottom: 12 }}>
-            How are you feeling?
-          </p>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
-            {MOOD_OPTIONS.map(mood => {
-              const isSelected = selectedMood === mood.key;
-              return (
-                <div key={mood.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-                  <button
-                    onClick={() => handleMoodSelect(mood.key)}
-                    style={{
-                      width: 36, height: 36, borderRadius: 18,
-                      backgroundColor: isSelected ? '#FFFFFF' : 'rgba(255,255,255,0.12)',
-                      border: `1px solid ${isSelected ? '#FFFFFF' : 'rgba(255,255,255,0.3)'}`,
-                      cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 11,
-                      color: isSelected ? '#1E8A4F' : 'transparent',
-                    }}
-                  >
-                    {isSelected ? '✓' : ''}
-                  </button>
-                  <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 9, color: 'rgba(255,255,255,0.65)', letterSpacing: '0.1em', textTransform: 'uppercase', textAlign: 'center', maxWidth: 48 }}>
-                    {mood.label}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Log buttons row */}
-        <div style={{ display: 'flex', gap: 12, width: '100%', marginBottom: 32 }}>
-          <button
-            onClick={() => setShowGlucoseSheet(true)}
-            style={{
-              flex: 1, height: 40, borderRadius: 12, paddingLeft: 16, paddingRight: 16,
-              backgroundColor: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)',
-              cursor: 'pointer',
-              fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13, color: '#FFFFFF',
-            }}
-          >
-            🩸 Log glucose
-          </button>
-          <button
-            onClick={() => setShowKetonesSheet(true)}
-            style={{
-              flex: 1, height: 40, borderRadius: 12, paddingLeft: 16, paddingRight: 16,
-              backgroundColor: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)',
-              cursor: 'pointer',
-              fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13, color: '#FFFFFF',
-            }}
-          >
-            🔥 Log ketones
-          </button>
-        </div>
-
-        {error && (
-          <p style={{ color: '#FFCDD2', fontFamily: 'Lato, sans-serif', fontSize: 14, marginBottom: 16, textAlign: 'center' }}>{error}</p>
-        )}
-
-        {/* End my fast button */}
-        <button
-          onClick={() => setConfirm(true)}
-          style={{
-            height: 48, borderRadius: 24,
-            backgroundColor: 'rgba(255,255,255,0.18)',
-            border: '1px solid rgba(255,255,255,0.35)',
-            color: '#FFFFFF',
-            fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 15,
-            cursor: 'pointer',
-            width: '100%',
-            marginTop: 'auto',
-          }}
-        >
-          End my fast
-        </button>
 
         {/* F03 — End my fast confirmation sheet */}
         {confirm && (
