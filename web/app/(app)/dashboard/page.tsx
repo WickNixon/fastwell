@@ -962,9 +962,9 @@ export default function DashboardPage() {
         // No active fast — clear localStorage so stale data can't resurrect it
         try { localStorage.removeItem(FAST_KEY); } catch {}
         if (recentFast && recentFast.ended_at) {
-          // Recently completed fast — show quiet state if within 24 hours
-          const hoursSinceEnd = (Date.now() - new Date(recentFast.ended_at).getTime()) / 3600000;
-          if (hoursSinceEnd < 24) {
+          // Show complete card only if ended within the last 10 seconds
+          const msSinceEnd = Date.now() - new Date(recentFast.ended_at).getTime();
+          if (msSinceEnd < 10000) {
             setCompletedFast(recentFast as FastingSession);
             // Show popup once for uncelebrated completions (e.g. ended on another device)
             if (!recentFast.completion_celebrated) {
@@ -1035,6 +1035,18 @@ export default function DashboardPage() {
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [load, today]);
+
+  // Auto-dismiss the fast complete card 10s after the fast ended
+  useEffect(() => {
+    if (!completedFast?.ended_at) return;
+    const msSinceEnd = Date.now() - new Date(completedFast.ended_at).getTime();
+    if (msSinceEnd >= 10000) {
+      setCompletedFast(null);
+      return;
+    }
+    const timer = setTimeout(() => setCompletedFast(null), 10000 - msSinceEnd);
+    return () => clearTimeout(timer);
+  }, [completedFast?.id]);
 
   const startFast = async (protocol?: string, customHrs?: number) => {
     if (!user || starting) return;
