@@ -113,6 +113,7 @@ export default function FastingTimerPage() {
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [showGlucoseSheet, setShowGlucoseSheet] = useState(false);
   const [showKetonesSheet, setShowKetonesSheet] = useState(false);
+  const [earlyEnd, setEarlyEnd] = useState(false);
 
   const handleMoodSelect = async (moodKey: string) => {
     const newMood = selectedMood === moodKey ? null : moodKey;
@@ -245,12 +246,27 @@ export default function FastingTimerPage() {
       return;
     }
     try { localStorage.removeItem(FAST_KEY); } catch {}
-    try {
-      if (profile) {
-        await checkAndAwardBadges(profile.id);
+
+    const reachedGoal = durationHrs >= goalHours;
+
+    if (reachedGoal) {
+      try {
+        if (profile) {
+          await checkAndAwardBadges(profile.id);
+          const { data: badge } = await getSupabase()
+            .from('user_badges').select('*')
+            .eq('user_id', profile.id).eq('seen', false)
+            .order('earned_at', { ascending: false }).limit(1).maybeSingle();
+          setGratification({ badge: badge ?? null });
+        } else {
+          setGratification({ badge: null });
+        }
+      } catch {
+        setGratification({ badge: null });
       }
-    } catch {}
-    router.push('/dashboard');
+    } else {
+      setEarlyEnd(true);
+    }
   };
 
   const collectBadge = async () => {
@@ -501,6 +517,24 @@ export default function FastingTimerPage() {
               </button>
             </div>
           </>
+        )}
+
+        {/* Early end — fast ended before reaching protocol target */}
+        {earlyEnd && (
+          <div className="modal-overlay">
+            <div className="modal-sheet">
+              <div className="modal-handle" />
+              <p style={{ textAlign: 'center', fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 22, marginBottom: 8, color: 'var(--text)' }}>
+                Fast ended.
+              </p>
+              <p style={{ textAlign: 'center', fontFamily: 'Lato, sans-serif', fontSize: 16, color: 'var(--text-muted)', marginBottom: 24, lineHeight: 1.5 }}>
+                You went {Math.floor(elapsed / 3600)}h {Math.floor((elapsed % 3600) / 60)}m — that still counts as practice. Try again whenever you&apos;re ready.
+              </p>
+              <button className="btn btn-primary" onClick={() => router.push('/dashboard')}>
+                Back to home
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Gratification sheet */}
