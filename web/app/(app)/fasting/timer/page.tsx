@@ -299,7 +299,7 @@ export default function FastingTimerPage() {
         position: 'relative',
       }}>
         {/* Top bar — absolute so it overlays without consuming flex space */}
-        <div style={{ position: 'absolute', top: 56, left: 20, right: 20, display: 'flex', alignItems: 'center' }}>
+        <div style={{ position: 'absolute', top: 56, left: 20, right: 20, display: 'flex', alignItems: 'center', zIndex: 10 }}>
           <button
             type="button"
             onClick={() => router.push('/dashboard')}
