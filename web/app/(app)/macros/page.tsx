@@ -11,6 +11,7 @@ interface FoodLog {
   calories: number | null; protein_g: number | null; carbs_g: number | null;
   fat_g: number | null; fibre_g: number | null; confidence: string | null;
   notes: string | null; logged_at: string;
+  final_payload?: { items?: Array<unknown> } | null;
 }
 
 interface MealItem {
@@ -37,12 +38,6 @@ interface CorrectionEvent {
   newName?: string;
   userText?: string;
   at: string;
-}
-
-// Legacy flat shape — kept for the existing UI in this commit; replaced in Commit 3
-interface MacroResult {
-  meal_name?: string; calories?: number; protein_g?: number; carbs_g?: number;
-  fat_g?: number; fibre_g?: number; confidence?: string; notes?: string; error?: string;
 }
 
 function todayNZ() {
@@ -73,9 +68,14 @@ export default function MacrosPage() {
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState('image/jpeg');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [result, setResult] = useState<MacroResult | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [currentResult, setCurrentResult] = useState<AnalysisResult | null>(null);
   const [originalResult, setOriginalResult] = useState<AnalysisResult | null>(null);
   const [corrections, setCorrections] = useState<CorrectionEvent[]>([]);
+  const [isReanalysing, setIsReanalysing] = useState(false);
+  const [reanalysingItemName, setReanalysingItemName] = useState<string | null>(null);
+  const [describeExpanded, setDescribeExpanded] = useState(false);
+  const [describeText, setDescribeText] = useState('');
   const [saving, setSaving] = useState(false);
   const [todayLogs, setTodayLogs] = useState<FoodLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
@@ -116,9 +116,12 @@ export default function MacrosPage() {
       setMediaType(mt);
       setImageBase64(data);
       setImagePreview(dataUrl);
-      setResult(null);
+      setCurrentResult(null);
       setOriginalResult(null);
       setCorrections([]);
+      setAnalysisError(null);
+      setDescribeExpanded(false);
+      setDescribeText('');
       setAnalyzing(true);
     };
     reader.readAsDataURL(file);
@@ -135,39 +138,91 @@ export default function MacrosPage() {
           body: JSON.stringify({ imageBase64, mediaType }),
         });
         const data = await res.json();
-        setResult(data);
-        if (!data.error && Array.isArray(data.items)) {
-          setOriginalResult(data as AnalysisResult);
+        if (data.error) {
+          setAnalysisError(data.error);
+        } else {
+          const result = data as AnalysisResult;
+          setCurrentResult(result);
+          setOriginalResult(result);
         }
       } catch {
-        setResult({ error: 'Analysis failed — try a clearer photo' });
+        setAnalysisError('Analysis failed — try a clearer photo');
       }
       setAnalyzing(false);
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageBase64]);
 
-  const saveMeal = async () => {
-    if (!result || result.error || !user) return;
-    setSaving(true);
-    let imageUrl: string | null = null;
-    if (imageBase64) {
-      try {
-        const filename = `${user.id}/${Date.now()}.jpg`;
-        const bytes = Uint8Array.from(atob(imageBase64), c => c.charCodeAt(0));
-        const { data: up } = await supabase.storage.from('food-images').upload(filename, bytes, { contentType: mediaType });
-        if (up) imageUrl = supabase.storage.from('food-images').getPublicUrl(filename).data.publicUrl;
-      } catch {}
-    }
+  const handleAlternativeTap = async (item: MealItem, alternative: string) => {
+    setReanalysingItemName(item.name);
+    setIsReanalysing(true);
     try {
-      // currentResult is the latest analysis response (same as original when no corrections applied)
-      const currentResult = originalResult ?? (result as unknown as AnalysisResult);
-      const mealName = currentResult?.items?.map(i => i.name).join(', ') ?? result.meal_name ?? 'Meal';
-      const totalCalories = currentResult?.items?.reduce((s, i) => s + i.calories, 0) ?? result.calories ?? null;
-      const totalProtein = currentResult?.items?.reduce((s, i) => s + i.protein_g, 0) ?? result.protein_g ?? null;
-      const totalCarbs = currentResult?.items?.reduce((s, i) => s + i.carbs_g, 0) ?? result.carbs_g ?? null;
-      const totalFat = currentResult?.items?.reduce((s, i) => s + i.fat_g, 0) ?? result.fat_g ?? null;
-      const totalFibre = currentResult?.items?.reduce((s, i) => s + i.fibre_g, 0) ?? result.fibre_g ?? null;
+      const res = await fetch('/api/analyze-meal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64,
+          mediaType,
+          correction: { type: 'item_swap', oldName: item.name, newName: alternative },
+        }),
+      });
+      const data = await res.json();
+      if (!data.error) {
+        setCorrections(prev => [...prev, { type: 'item_swap', oldName: item.name, newName: alternative, at: new Date().toISOString() }]);
+        setCurrentResult(data as AnalysisResult);
+      }
+    } catch {}
+    setReanalysingItemName(null);
+    setIsReanalysing(false);
+  };
+
+  const handleDescribeSubmit = async () => {
+    const text = describeText.trim();
+    if (!text) return;
+    setIsReanalysing(true);
+    try {
+      const res = await fetch('/api/analyze-meal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64,
+          mediaType,
+          correction: { type: 'describe', userText: text },
+        }),
+      });
+      const data = await res.json();
+      if (!data.error) {
+        setCorrections(prev => [...prev, { type: 'describe', userText: text, at: new Date().toISOString() }]);
+        setCurrentResult(data as AnalysisResult);
+        setDescribeExpanded(false);
+        setDescribeText('');
+      }
+    } catch {}
+    setIsReanalysing(false);
+  };
+
+  const uploadImage = async (): Promise<string | null> => {
+    if (!imageBase64 || !user) return null;
+    try {
+      const filename = `${user.id}/${Date.now()}.jpg`;
+      const bytes = Uint8Array.from(atob(imageBase64), c => c.charCodeAt(0));
+      const { data: up } = await supabase.storage.from('food-images').upload(filename, bytes, { contentType: mediaType });
+      if (up) return supabase.storage.from('food-images').getPublicUrl(filename).data.publicUrl;
+    } catch {}
+    return null;
+  };
+
+  const saveMeal = async () => {
+    if (!currentResult || !user) return;
+    setSaving(true);
+    const imageUrl = await uploadImage();
+    try {
+      const mealName = currentResult.items.map(i => i.name).join(', ');
+      const totalCalories = currentResult.items.reduce((s, i) => s + i.calories, 0);
+      const totalProtein  = currentResult.items.reduce((s, i) => s + i.protein_g, 0);
+      const totalCarbs    = currentResult.items.reduce((s, i) => s + i.carbs_g, 0);
+      const totalFat      = currentResult.items.reduce((s, i) => s + i.fat_g, 0);
+      const totalFibre    = currentResult.items.reduce((s, i) => s + i.fibre_g, 0);
 
       await supabase.from('food_logs').insert({
         user_id: user.id,
@@ -178,14 +233,14 @@ export default function MacrosPage() {
         carbs_g: totalCarbs,
         fat_g: totalFat,
         fibre_g: totalFibre,
-        confidence: currentResult?.overall_confidence ?? result.confidence ?? null,
-        notes: currentResult?.notes ?? result.notes ?? null,
-        ai_original_payload: originalResult ?? null,
+        confidence: currentResult.overall_confidence,
+        notes: currentResult.notes || null,
+        ai_original_payload: originalResult,
         ai_corrections: corrections,
-        final_payload: currentResult ?? null,
+        final_payload: currentResult,
       });
-      setResult(null); setImageBase64(null); setImagePreview(null);
-      setOriginalResult(null); setCorrections([]);
+      setCurrentResult(null); setOriginalResult(null); setCorrections([]);
+      setImageBase64(null); setImagePreview(null); setAnalysisError(null);
       await loadTodayLogs();
       if (user) checkAndAwardBadges(user.id).catch(() => {});
     } catch {}
@@ -193,32 +248,31 @@ export default function MacrosPage() {
   };
 
   const reset = () => {
-    setResult(null); setImageBase64(null); setImagePreview(null); setAnalyzing(false);
-    setOriginalResult(null); setCorrections([]);
+    setCurrentResult(null); setOriginalResult(null); setCorrections([]);
+    setImageBase64(null); setImagePreview(null); setAnalyzing(false);
+    setAnalysisError(null); setDescribeExpanded(false); setDescribeText('');
+    setReanalysingItemName(null); setIsReanalysing(false);
   };
 
   const openEditManual = () => {
-    setEditName(result?.meal_name ?? '');
-    setEditCalories(result?.calories != null ? String(Math.round(result.calories)) : '');
-    setEditProtein(result?.protein_g != null ? String(Math.round(result.protein_g)) : '');
-    setEditCarbs(result?.carbs_g != null ? String(Math.round(result.carbs_g)) : '');
-    setEditFat(result?.fat_g != null ? String(Math.round(result.fat_g)) : '');
-    setEditFibre(result?.fibre_g != null ? String(Math.round(result.fibre_g)) : '');
+    const totalCal    = currentResult?.items.reduce((s, i) => s + i.calories, 0) ?? 0;
+    const totalProt   = currentResult?.items.reduce((s, i) => s + i.protein_g, 0) ?? 0;
+    const totalCarbs_ = currentResult?.items.reduce((s, i) => s + i.carbs_g, 0) ?? 0;
+    const totalFat_   = currentResult?.items.reduce((s, i) => s + i.fat_g, 0) ?? 0;
+    const totalFibre_ = currentResult?.items.reduce((s, i) => s + i.fibre_g, 0) ?? 0;
+    setEditName(currentResult?.items.map(i => i.name).join(', ') ?? '');
+    setEditCalories(totalCal ? String(Math.round(totalCal)) : '');
+    setEditProtein(totalProt ? String(Math.round(totalProt)) : '');
+    setEditCarbs(totalCarbs_ ? String(Math.round(totalCarbs_)) : '');
+    setEditFat(totalFat_ ? String(Math.round(totalFat_)) : '');
+    setEditFibre(totalFibre_ ? String(Math.round(totalFibre_)) : '');
     setShowEditManual(true);
   };
 
   const saveEditedMeal = async () => {
     if (!user) return;
     setSaving(true);
-    let imageUrl: string | null = null;
-    if (imageBase64) {
-      try {
-        const filename = `${user.id}/${Date.now()}.jpg`;
-        const bytes = Uint8Array.from(atob(imageBase64), c => c.charCodeAt(0));
-        const { data: up } = await supabase.storage.from('food-images').upload(filename, bytes, { contentType: mediaType });
-        if (up) imageUrl = supabase.storage.from('food-images').getPublicUrl(filename).data.publicUrl;
-      } catch {}
-    }
+    const imageUrl = await uploadImage();
     try {
       const manualCalories = editCalories ? parseFloat(editCalories) : null;
       const manualProtein  = editProtein  ? parseFloat(editProtein)  : null;
@@ -264,8 +318,8 @@ export default function MacrosPage() {
         final_payload: manualFinalPayload,
       });
       setShowEditManual(false);
-      setResult(null); setImageBase64(null); setImagePreview(null);
-      setOriginalResult(null); setCorrections([]);
+      setCurrentResult(null); setOriginalResult(null); setCorrections([]);
+      setImageBase64(null); setImagePreview(null); setAnalysisError(null);
       await loadTodayLogs();
       checkAndAwardBadges(user.id).catch(() => {});
     } catch {}
@@ -277,6 +331,14 @@ export default function MacrosPage() {
   const totalCarbs    = todayLogs.reduce((s, l) => s + (l.carbs_g ?? 0), 0);
   const totalFat      = todayLogs.reduce((s, l) => s + (l.fat_g ?? 0), 0);
   const totalFibre    = todayLogs.reduce((s, l) => s + (l.fibre_g ?? 0), 0);
+
+  const summaryTotals = currentResult ? {
+    calories: currentResult.items.reduce((s, i) => s + i.calories, 0),
+    protein:  currentResult.items.reduce((s, i) => s + i.protein_g, 0),
+    carbs:    currentResult.items.reduce((s, i) => s + i.carbs_g, 0),
+    fat:      currentResult.items.reduce((s, i) => s + i.fat_g, 0),
+    fibre:    currentResult.items.reduce((s, i) => s + i.fibre_g, 0),
+  } : null;
 
   return (
     <div className="page page-top">
@@ -348,41 +410,153 @@ export default function MacrosPage() {
         <div className="card" style={{ marginBottom: 20 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={imagePreview} alt="Meal preview" style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 10, marginBottom: 12 }} />
+
           {analyzing && (
             <p style={{ textAlign: 'center', fontFamily: 'Lato, sans-serif', fontSize: 14, color: 'var(--text-muted)', padding: '12px 0' }}>
               Analysing your meal…
             </p>
           )}
-          {result && !result.error && (
+
+          {analysisError && (
             <>
-              <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 17, marginBottom: 12, color: 'var(--text)' }}>
-                {result.meal_name ?? 'Meal'}
+              <p style={{ textAlign: 'center', fontSize: 14, color: '#C62828', fontFamily: 'Lato, sans-serif', marginBottom: 12 }}>
+                {analysisError}
               </p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
-                {[
-                  { label: 'Calories', value: result.calories ? `${result.calories}` : '—' },
-                  { label: 'Protein',  value: result.protein_g ? `${result.protein_g}g` : '—' },
-                  { label: 'Carbs',    value: result.carbs_g ? `${result.carbs_g}g` : '—' },
-                  { label: 'Fat',      value: result.fat_g ? `${result.fat_g}g` : '—' },
-                  { label: 'Fibre',    value: result.fibre_g ? `${result.fibre_g}g` : '—' },
-                ].map(({ label, value }) => (
-                  <div key={label} style={{ textAlign: 'center', padding: '10px 4px', backgroundColor: 'var(--primary-pale)', borderRadius: 8 }}>
-                    <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 14, color: 'var(--primary)' }}>{value}</p>
-                    <p style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>{label}</p>
-                  </div>
-                ))}
+              <button className="btn btn-ghost" onClick={reset}>Try again</button>
+            </>
+          )}
+
+          {currentResult && (
+            <>
+              {/* Meal summary headline */}
+              <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 17, color: '#1A1A1A', marginBottom: 6 }}>
+                {currentResult.items.map(i => i.name).join(', ')}
+              </p>
+
+              {/* Confidence label — only when not high */}
+              {currentResult.overall_confidence !== 'high' && (
+                <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 12, color: '#6B7066', marginBottom: 12 }}>
+                  {currentResult.overall_confidence === 'medium'
+                    ? 'Medium confidence — tap any item to fix'
+                    : 'Low confidence — tap an item or describe your meal below'}
+                </p>
+              )}
+
+              {/* Per-item list */}
+              <div style={{ marginBottom: 12 }}>
+                {currentResult.items.map(item => {
+                  const spinning = reanalysingItemName === item.name && isReanalysing;
+                  return (
+                    <div
+                      key={item.name}
+                      style={{
+                        position: 'relative',
+                        backgroundColor: '#F8F5EC',
+                        borderRadius: 12,
+                        padding: 12,
+                        marginBottom: 8,
+                        opacity: spinning ? 0.6 : 1,
+                      }}
+                    >
+                      {spinning && (
+                        <div style={{ position: 'absolute', top: 10, right: 12, fontSize: 14, color: 'var(--primary)' }}>
+                          ⏳
+                        </div>
+                      )}
+                      <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14, color: '#1A1A1A', marginBottom: 3 }}>
+                        {item.name}
+                      </p>
+                      <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: '#6B7066' }}>
+                        {item.grams}g · {item.calories} cal · {item.protein_g}g protein
+                      </p>
+                      {(item.confidence === 'medium' || item.confidence === 'low') && item.alternatives.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                          {item.alternatives.map(alt => (
+                            <button
+                              key={alt}
+                              onClick={() => !isReanalysing && handleAlternativeTap(item, alt)}
+                              disabled={isReanalysing}
+                              style={{
+                                borderRadius: 14, padding: '4px 10px',
+                                backgroundColor: 'white', border: '1px solid #E8E4D9',
+                                fontFamily: 'Lato, sans-serif', fontSize: 13, color: '#1A1A1A',
+                                cursor: isReanalysing ? 'not-allowed' : 'pointer',
+                              }}
+                            >
+                              {alt}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-              {result.notes && (
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', marginBottom: 12, lineHeight: 1.5 }}>
-                  {result.notes}
+
+              {/* Describe your meal expandable */}
+              <div style={{ marginBottom: 14 }}>
+                <button
+                  onClick={() => setDescribeExpanded(!describeExpanded)}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontFamily: 'Lato, sans-serif', fontSize: 13, color: 'var(--primary)',
+                    padding: '4px 0', width: '100%', textAlign: 'left',
+                  }}
+                >
+                  {describeExpanded ? 'Close ↑' : 'None of these right? Describe your meal →'}
+                </button>
+                {describeExpanded && (
+                  <div style={{ marginTop: 8 }}>
+                    <textarea
+                      value={describeText}
+                      onChange={e => setDescribeText(e.target.value)}
+                      placeholder="e.g. grilled salmon with steamed broccoli and brown rice"
+                      rows={3}
+                      style={{
+                        width: '100%', borderRadius: 10, border: '1px solid #E8E4D9',
+                        padding: '10px 12px', fontFamily: 'Lato, sans-serif', fontSize: 13,
+                        color: '#1A1A1A', backgroundColor: '#FAFAFA', resize: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <button
+                      className="btn btn-outline"
+                      onClick={handleDescribeSubmit}
+                      disabled={isReanalysing || !describeText.trim()}
+                      style={{ marginTop: 8 }}
+                    >
+                      {isReanalysing ? 'Re-analysing…' : 'Re-analyse'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Total macros pills */}
+              {summaryTotals && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, marginBottom: 14 }}>
+                  {[
+                    { label: 'Cal',     value: Math.round(summaryTotals.calories) },
+                    { label: 'Protein', value: `${Math.round(summaryTotals.protein)}g` },
+                    { label: 'Carbs',   value: `${Math.round(summaryTotals.carbs)}g` },
+                    { label: 'Fat',     value: `${Math.round(summaryTotals.fat)}g` },
+                    { label: 'Fibre',   value: `${Math.round(summaryTotals.fibre)}g` },
+                  ].map(({ label, value }) => (
+                    <div key={label} style={{ textAlign: 'center', padding: '10px 4px', backgroundColor: 'var(--primary-pale)', borderRadius: 8 }}>
+                      <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 14, color: 'var(--primary)' }}>{value}</p>
+                      <p style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>{label}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Notes */}
+              {currentResult.notes && (
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', marginBottom: 14, lineHeight: 1.5 }}>
+                  {currentResult.notes}
                 </p>
               )}
-              {result.confidence === 'low' && (
-                <p style={{ fontSize: 12, color: 'var(--accent)', fontFamily: 'Lato, sans-serif', marginBottom: 12 }}>
-                  This is an estimate — portions are hard to judge from photos.
-                </p>
-              )}
-              <button className="btn btn-primary" onClick={saveMeal} disabled={saving} style={{ marginBottom: 8 }}>
+
+              <button className="btn btn-primary" onClick={saveMeal} disabled={saving || isReanalysing} style={{ marginBottom: 8 }}>
                 {saving ? 'Saving…' : 'Save this meal'}
               </button>
               <button className="btn btn-ghost" onClick={reset} style={{ marginBottom: 4 }}>Retake photo.</button>
@@ -392,14 +566,6 @@ export default function MacrosPage() {
               >
                 Edit manually
               </button>
-            </>
-          )}
-          {result?.error && (
-            <>
-              <p style={{ textAlign: 'center', fontSize: 14, color: '#C62828', fontFamily: 'Lato, sans-serif', marginBottom: 12 }}>
-                {result.error}
-              </p>
-              <button className="btn btn-ghost" onClick={reset}>Try again</button>
             </>
           )}
         </div>
@@ -429,41 +595,55 @@ export default function MacrosPage() {
           </p>
         )}
 
-        {todayLogs.map((log, i) => (
-          <div key={log.id} style={{
-            display: 'flex', gap: 12, padding: '12px 0',
-            borderBottom: i < todayLogs.length - 1 ? '1px solid var(--border)' : 'none',
-          }}>
-            {log.image_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={log.image_url} alt={log.meal_name ?? ''} style={{ width: 54, height: 54, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
-            ) : (
-              <div style={{ width: 54, height: 54, borderRadius: 8, backgroundColor: 'var(--primary-pale)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 22 }}>
-                🍽
-              </div>
-            )}
-            <div style={{ flex: 1 }}>
-              <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14, color: 'var(--text)', marginBottom: 3 }}>
-                {log.meal_name ?? 'Meal'}
-              </p>
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>
-                {[
-                  log.calories   ? `${Math.round(log.calories)} cal`       : null,
-                  log.protein_g  ? `${Math.round(log.protein_g)}g protein` : null,
-                  log.carbs_g    ? `${Math.round(log.carbs_g)}g carbs`     : null,
-                ].filter(Boolean).join(' · ')}
-              </p>
-              {log.confidence === 'low' && (
-                <p style={{ fontSize: 11, color: 'var(--accent)', fontFamily: 'Lato, sans-serif', marginTop: 2 }}>
-                  Estimate — portions are hard to judge from photos
-                </p>
+        {todayLogs.map((log, i) => {
+          const itemCount = Array.isArray(log.final_payload?.items) ? log.final_payload.items.length : null;
+          return (
+            <div key={log.id} style={{
+              display: 'flex', gap: 12, padding: '12px 0',
+              borderBottom: i < todayLogs.length - 1 ? '1px solid var(--border)' : 'none',
+            }}>
+              {log.image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={log.image_url} alt={log.meal_name ?? ''} style={{ width: 54, height: 54, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: 54, height: 54, borderRadius: 8, backgroundColor: 'var(--primary-pale)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 22 }}>
+                  🍽
+                </div>
               )}
-              <p style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', marginTop: 3 }}>
-                {new Date(log.logged_at).toLocaleTimeString('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', minute: '2-digit', hour12: true })}
-              </p>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                  <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>
+                    {log.meal_name ?? 'Meal'}
+                  </p>
+                  {itemCount && itemCount > 1 && (
+                    <span style={{
+                      fontFamily: 'Lato, sans-serif', fontSize: 11, color: 'var(--primary)',
+                      backgroundColor: 'var(--primary-pale)', borderRadius: 10,
+                      padding: '1px 7px',
+                    }}>
+                      {itemCount} items
+                    </span>
+                  )}
+                </div>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>
+                  {[
+                    log.calories   ? `${Math.round(log.calories)} cal`       : null,
+                    log.protein_g  ? `${Math.round(log.protein_g)}g protein` : null,
+                    log.carbs_g    ? `${Math.round(log.carbs_g)}g carbs`     : null,
+                  ].filter(Boolean).join(' · ')}
+                </p>
+                {log.confidence === 'low' && (
+                  <p style={{ fontSize: 11, color: 'var(--accent)', fontFamily: 'Lato, sans-serif', marginTop: 2 }}>
+                    Estimate — portions are hard to judge from photos
+                  </p>
+                )}
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', marginTop: 3 }}>
+                  {new Date(log.logged_at).toLocaleTimeString('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', minute: '2-digit', hour12: true })}
+                </p>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Hidden file inputs */}
