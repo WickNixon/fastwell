@@ -301,7 +301,8 @@ export default function FastingTimerPage() {
         {/* Top bar — absolute so it overlays without consuming flex space */}
         <div style={{ position: 'absolute', top: 56, left: 20, right: 20, display: 'flex', alignItems: 'center' }}>
           <button
-            onClick={() => router.back()}
+            type="button"
+            onClick={() => router.push('/dashboard')}
             style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF', fontSize: 20, flexShrink: 0 }}
             aria-label="Back"
           >
