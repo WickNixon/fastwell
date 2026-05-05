@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase';
 import UpgradeModal from '@/components/UpgradeModal';
 import { checkAndAwardBadges } from '@/lib/checkBadges';
 import { useSwipeable } from 'react-swipeable';
+import { DateScroller } from '@/app/components/DateScroller';
 
 interface FoodLog {
   id: string; meal_name: string | null; image_url: string | null;
@@ -222,6 +223,7 @@ export default function MacrosPage() {
   const [describeExpanded, setDescribeExpanded] = useState(false);
   const [describeText, setDescribeText] = useState('');
   const [saving, setSaving] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(() => todayNZ());
   const [todayLogs, setTodayLogs] = useState<FoodLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
   const [showEditManual, setShowEditManual] = useState(false);
@@ -232,9 +234,9 @@ export default function MacrosPage() {
   const [editFat, setEditFat] = useState('');
   const [editFibre, setEditFibre] = useState('');
 
-  const loadTodayLogs = useCallback(async () => {
+  const loadDayLogs = useCallback(async (nzDate: string) => {
     if (!user) return;
-    const { gte, lte } = nzDayBoundsUTC(todayNZ());
+    const { gte, lte } = nzDayBoundsUTC(nzDate);
     const { data, error } = await supabase
       .from('food_logs')
       .select('*')
@@ -242,12 +244,12 @@ export default function MacrosPage() {
       .gte('logged_at', gte)
       .lte('logged_at', lte)
       .order('logged_at', { ascending: false });
-    if (error) console.error('loadTodayLogs error:', error);
+    if (error) console.error('loadDayLogs error:', error);
     setTodayLogs(data ?? []);
     setLoadingLogs(false);
-  }, [user]);
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { loadTodayLogs(); }, [loadTodayLogs]);
+  useEffect(() => { loadDayLogs(selectedDate); }, [loadDayLogs, selectedDate]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -391,7 +393,7 @@ export default function MacrosPage() {
       }
       setCurrentResult(null); setOriginalResult(null); setCorrections([]);
       setImageBase64(null); setImagePreview(null); setAnalysisError(null);
-      await loadTodayLogs();
+      await loadDayLogs(todayNZ());
       checkAndAwardBadges(user.id).catch(() => {});
     } catch (e) {
       console.error('saveMeal error:', e);
@@ -477,7 +479,7 @@ export default function MacrosPage() {
       setShowEditManual(false);
       setCurrentResult(null); setOriginalResult(null); setCorrections([]);
       setImageBase64(null); setImagePreview(null); setAnalysisError(null);
-      await loadTodayLogs();
+      await loadDayLogs(todayNZ());
       checkAndAwardBadges(user.id).catch(() => {});
     } catch (e) {
       console.error('saveEditedMeal error:', e);
@@ -489,7 +491,7 @@ export default function MacrosPage() {
     if (!user) return;
     const { error } = await supabase.from('food_logs').delete().eq('id', id).eq('user_id', user.id);
     if (error) { console.error('deleteMeal error:', error); return; }
-    await loadTodayLogs();
+    await loadDayLogs(selectedDate);
   };
 
   const totalCalories = todayLogs.reduce((s, l) => s + (l.calories ?? 0), 0);
@@ -506,10 +508,23 @@ export default function MacrosPage() {
     fibre:    currentResult.items.reduce((s, i) => s + i.fibre_g, 0),
   } : null;
 
+  const todayStr = todayNZ();
+  const isViewingToday = selectedDate === todayStr;
+
+  function dayPillLabel(nzDate: string): string {
+    if (nzDate === todayStr) return 'TODAY';
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    if (nzDate === d.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })) return 'YESTERDAY';
+    return new Date(`${nzDate}T12:00:00Z`).toLocaleDateString('en-NZ', {
+      timeZone: 'Pacific/Auckland', weekday: 'short', day: 'numeric', month: 'short',
+    }).toUpperCase();
+  }
+
   return (
     <div className="page page-top">
       {/* Header */}
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ marginBottom: 12 }}>
         <h1 style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 22, color: 'var(--text)', marginBottom: 2 }}>
           Macros
         </h1>
@@ -518,9 +533,22 @@ export default function MacrosPage() {
         </p>
       </div>
 
+      {/* Calendar pill row */}
+      <div style={{ marginBottom: 16 }}>
+        <DateScroller
+          selectedDate={selectedDate}
+          onDateSelect={date => {
+            setSelectedDate(date);
+            loadDayLogs(date);
+          }}
+        />
+      </div>
+
       {/* Daily totals — always visible */}
       <div className="card" style={{ marginBottom: 20 }}>
-        <p className="section-label" style={{ marginBottom: 12 }}>Today&apos;s totals</p>
+        <p className="section-label" style={{ marginBottom: 12 }}>
+          {isViewingToday ? "Today's totals" : `${dayPillLabel(selectedDate)}'s totals`}
+        </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
           {[
             { label: 'cal',     value: Math.round(totalCalories) },
@@ -560,8 +588,8 @@ export default function MacrosPage() {
         </div>
       ) : (
         <>
-      {/* Log a meal CTA */}
-      {!imagePreview && (
+      {/* Log a meal CTA — today only */}
+      {!imagePreview && isViewingToday && (
         <button
           className="btn btn-primary"
           onClick={() => setShowSheet(true)}
@@ -740,8 +768,10 @@ export default function MacrosPage() {
       {/* Today's meals */}
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <p className="section-label">Meals today</p>
-          {todayLogs.length > 0 && (
+          <p className="section-label">
+            {isViewingToday ? 'Meals today' : `Meals ${dayPillLabel(selectedDate).toLowerCase()}`}
+          </p>
+          {todayLogs.length > 0 && isViewingToday && (
             <button
               onClick={() => setShowSheet(true)}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13 }}
@@ -757,7 +787,9 @@ export default function MacrosPage() {
 
         {!loadingLogs && todayLogs.length === 0 && !imagePreview && (
           <p style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', lineHeight: 1.6 }}>
-            No meals logged yet today. Tap <strong>Log a meal</strong> above to take a photo and let Claude analyse your macros.
+            {isViewingToday
+              ? <>No meals logged yet today. Tap <strong>Log a meal</strong> above to take a photo and let Claude analyse your macros.</>
+              : 'No meals logged on this day.'}
           </p>
         )}
 
