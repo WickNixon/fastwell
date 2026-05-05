@@ -39,10 +39,10 @@ How to look at a meal photo:
 
 6. Macros. Use standard reference values for the food you've identified at the portion you've estimated. Round protein, carbs, fat, and fibre to whole grams. Round calories to the nearest 5. Do not invent precision.
 
-7. Per-item alternatives. For every item where your confidence is below 'high', provide 2-3 plausible alternative identifications. The alternatives should be realistic look-alikes, not random foods. Do not provide alternatives when you are confident.
+7. Per-item alternatives. For every item, provide 2-3 plausible alternative identifications, regardless of your confidence level. Even when you are confident, list realistic look-alikes that the user might want to swap to. Alternatives should be realistic look-alikes — not random foods. The user always sees these as tappable options to correct your identification.
 
 8. Confidence ratings:
-   - 'high' — you would bet money on this identification.
+   - 'high' — used sparingly. Only when you can identify the food unambiguously by multiple visual cues (texture, colour, shape, plate context all agree). When in doubt between two foods, use 'medium' even if you have a strong lean.
    - 'medium' — your best guess, but you can see how it could plausibly be something else.
    - 'low' — you genuinely cannot tell; this is an educated guess.
 
@@ -78,7 +78,7 @@ Schema:
 
 Rules:
 - One entry in "items" per distinct food on the plate. Do not group "vegetables" as one item if you can distinguish carrots, potatoes, and capsicum — list them separately.
-- "alternatives" must be an empty array [] if confidence is "high". Otherwise 2-3 entries.
+- "alternatives" must always contain 2-3 plausible look-alike entries, regardless of confidence level. Never return an empty alternatives array unless the item is so unique it has no realistic look-alike (rare).
 - "overall_confidence" reflects your confidence in the meal as a whole — if any item is medium or low, the overall is at most medium.
 
 If you cannot identify any food in the image, return:

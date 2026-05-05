@@ -651,23 +651,35 @@ export default function MacrosPage() {
                       <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: '#6B7066' }}>
                         {item.grams}g · {item.calories} cal · {item.protein_g}g protein
                       </p>
-                      {(item.confidence === 'medium' || item.confidence === 'low') && item.alternatives.length > 0 && (
+                      {item.alternatives.length > 0 && (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                          {item.alternatives.map(alt => (
-                            <button
-                              key={alt}
-                              onClick={() => !isReanalysing && handleAlternativeTap(item, alt)}
-                              disabled={isReanalysing}
-                              style={{
-                                borderRadius: 14, padding: '4px 10px',
-                                backgroundColor: 'white', border: '1px solid #E8E4D9',
-                                fontFamily: 'Lato, sans-serif', fontSize: 13, color: '#1A1A1A',
-                                cursor: isReanalysing ? 'not-allowed' : 'pointer',
-                              }}
-                            >
-                              {alt}
-                            </button>
-                          ))}
+                          {item.confidence !== 'high' && (
+                            <p style={{ width: '100%', fontFamily: 'Lato, sans-serif', fontSize: 11, color: '#6B7066', marginBottom: 2 }}>
+                              Tap to fix
+                            </p>
+                          )}
+                          {item.alternatives.map(alt => {
+                            const isHigh = item.confidence === 'high';
+                            return (
+                              <button
+                                key={alt}
+                                onClick={() => !isReanalysing && handleAlternativeTap(item, alt)}
+                                disabled={isReanalysing}
+                                style={{
+                                  borderRadius: 14,
+                                  padding: isHigh ? '3px 8px' : '4px 10px',
+                                  background: isHigh ? 'transparent' : '#FFFFFF',
+                                  border: isHigh ? '1px solid #E8E4D9' : '1px solid #D9ECE0',
+                                  fontFamily: 'Lato, sans-serif',
+                                  fontSize: isHigh ? 12 : 13,
+                                  color: isHigh ? '#6B7066' : '#1A1A1A',
+                                  cursor: isReanalysing ? 'not-allowed' : 'pointer',
+                                }}
+                              >
+                                {alt}
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
