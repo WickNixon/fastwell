@@ -337,7 +337,12 @@ export default function MacrosPage() {
   };
 
   const saveMeal = async () => {
-    if (!currentResult || !user) return;
+    if (!currentResult) return;
+    if (!user) {
+      console.error('saveMeal: user is null — likely auth race');
+      setAnalysisError('Please wait a moment and try again.');
+      return;
+    }
     setSaving(true);
     const imageUrl = await uploadImage();
     try {
@@ -365,12 +370,13 @@ export default function MacrosPage() {
       });
       if (insertErr) {
         console.error('saveMeal insert error:', insertErr);
+        setAnalysisError(`Save failed: ${insertErr.message}`);
         setSaving(false);
         return;
       }
       setCurrentResult(null); setOriginalResult(null); setCorrections([]);
       setImageBase64(null); setImagePreview(null); setAnalysisError(null);
-      await loadDayLogs(todayNZ());
+      await loadDayLogs(selectedDate);
       checkAndAwardBadges(user.id).catch(() => {});
     } catch (e) {
       console.error('saveMeal error:', e);
@@ -401,7 +407,11 @@ export default function MacrosPage() {
   };
 
   const saveEditedMeal = async () => {
-    if (!user) return;
+    if (!user) {
+      console.error('saveEditedMeal: user is null — likely auth race');
+      setAnalysisError('Please wait a moment and try again.');
+      return;
+    }
     setSaving(true);
     const imageUrl = await uploadImage();
     try {
@@ -450,13 +460,14 @@ export default function MacrosPage() {
       });
       if (insertErr) {
         console.error('saveEditedMeal insert error:', insertErr);
+        setAnalysisError(`Save failed: ${insertErr.message}`);
         setSaving(false);
         return;
       }
       setShowEditManual(false);
       setCurrentResult(null); setOriginalResult(null); setCorrections([]);
       setImageBase64(null); setImagePreview(null); setAnalysisError(null);
-      await loadDayLogs(todayNZ());
+      await loadDayLogs(selectedDate);
       checkAndAwardBadges(user.id).catch(() => {});
     } catch (e) {
       console.error('saveEditedMeal error:', e);
