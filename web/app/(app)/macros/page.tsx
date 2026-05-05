@@ -8,6 +8,7 @@ import UpgradeModal from '@/components/UpgradeModal';
 import { checkAndAwardBadges } from '@/lib/checkBadges';
 import { useSwipeable } from 'react-swipeable';
 import { DateScroller } from '@/app/components/DateScroller';
+import { todayNZ, nzDayBoundsUTC } from '@/lib/dateNZ';
 
 interface FoodLog {
   id: string; meal_name: string | null; image_url: string | null;
@@ -43,34 +44,10 @@ interface CorrectionEvent {
   at: string;
 }
 
-function todayNZ() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
-}
-
 function dateLabelNZ() {
   return new Date().toLocaleDateString('en-NZ', {
     timeZone: 'Pacific/Auckland', weekday: 'long', day: 'numeric', month: 'long',
   });
-}
-
-// Returns UTC ISO bounds that cover the full Pacific/Auckland calendar day for nzDateStr.
-// Needed because logged_at is TIMESTAMPTZ (UTC) but we want to filter by NZ calendar date.
-function nzDayBoundsUTC(nzDateStr: string): { gte: string; lte: string } {
-  const utcMidnight = new Date(`${nzDateStr}T00:00:00.000Z`);
-  const parts = new Intl.DateTimeFormat('en', {
-    timeZone: 'Pacific/Auckland',
-    hour: '2-digit', minute: '2-digit',
-    hour12: false,
-  }).formatToParts(utcMidnight);
-  const h = parseInt(parts.find(p => p.type === 'hour')?.value ?? '12', 10);
-  const m = parseInt(parts.find(p => p.type === 'minute')?.value ?? '0', 10);
-  // h is the NZ hour when it's UTC midnight. NZ midnight = UTC midnight - h hours - m minutes.
-  const adjustedH = h === 24 ? 0 : h;
-  const nzMidnightMs = utcMidnight.getTime() - adjustedH * 3_600_000 - m * 60_000;
-  return {
-    gte: new Date(nzMidnightMs).toISOString(),
-    lte: new Date(nzMidnightMs + 24 * 3_600_000 - 1).toISOString(),
-  };
 }
 
 function MealRow({ log, onDelete, onTap }: {
@@ -236,13 +213,13 @@ export default function MacrosPage() {
 
   const loadDayLogs = useCallback(async (nzDate: string) => {
     if (!user) return;
-    const { gte, lte } = nzDayBoundsUTC(nzDate);
+    const { startUTC, endUTC } = nzDayBoundsUTC(nzDate);
     const { data, error } = await supabase
       .from('food_logs')
       .select('*')
       .eq('user_id', user.id)
-      .gte('logged_at', gte)
-      .lte('logged_at', lte)
+      .gte('logged_at', startUTC)
+      .lte('logged_at', endUTC)
       .order('logged_at', { ascending: false });
     if (error) console.error('loadDayLogs error:', error);
     setTodayLogs(data ?? []);

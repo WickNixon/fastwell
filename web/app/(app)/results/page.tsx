@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { FastingSession } from '@/lib/types';
+import { todayNZ, nzDayBoundsUTC } from '@/lib/dateNZ';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -421,14 +422,15 @@ function FoodLogSection({ userId }: { userId: string }) {
   const [result, setResult] = useState<MacroResult | null>(null);
   const [saving, setSaving] = useState(false);
   const [todayLogs, setTodayLogs] = useState<FoodLog[]>([]);
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayNZ();
 
   const loadTodayLogs = useCallback(async () => {
     try {
+      const { startUTC, endUTC } = nzDayBoundsUTC(today);
       const { data } = await supabase.from('food_logs').select('*')
         .eq('user_id', userId)
-        .gte('logged_at', `${today}T00:00:00Z`)
-        .lte('logged_at', `${today}T23:59:59Z`)
+        .gte('logged_at', startUTC)
+        .lte('logged_at', endUTC)
         .order('logged_at', { ascending: false });
       setTodayLogs(data ?? []);
     } catch {}

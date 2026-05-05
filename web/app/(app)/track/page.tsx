@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
+import { todayNZ } from '@/lib/dateNZ';
 
 const LIFESTYLE = [
   { key: 'weight', label: 'Weight', icon: '⚖️', href: '/track/weight', metric: 'weight' },
@@ -28,7 +29,7 @@ export default function TrackPage() {
 
   const loadToday = useCallback(async () => {
     if (!profile) return;
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayNZ();
     const { data } = await getSupabase()
       .from('health_entries')
       .select('metric')
