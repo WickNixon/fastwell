@@ -1,10 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import UpgradeModal from '@/components/UpgradeModal';
 import { checkAndAwardBadges } from '@/lib/checkBadges';
+import { useSwipeable } from 'react-swipeable';
 
 interface FoodLog {
   id: string; meal_name: string | null; image_url: string | null;
@@ -70,9 +72,132 @@ function nzDayBoundsUTC(nzDateStr: string): { gte: string; lte: string } {
   };
 }
 
+function MealRow({ log, onDelete, onTap }: {
+  log: FoodLog;
+  onDelete: (id: string) => void;
+  onTap: (id: string) => void;
+}) {
+  const [swiped, setSwiped] = useState(false);
+  const [hovered, setHovered] = useState(false);
+
+  const handlers = useSwipeable({
+    onSwipedLeft: () => setSwiped(true),
+    onSwipedRight: () => setSwiped(false),
+    preventScrollOnSwipe: true,
+    trackTouch: true,
+  });
+
+  const itemCount = Array.isArray(log.final_payload?.items) ? log.final_payload.items.length : null;
+
+  const confirmDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm("Delete this meal? You can't undo this.")) onDelete(log.id);
+    setSwiped(false);
+  };
+
+  return (
+    <div style={{ position: 'relative', overflow: 'hidden', marginBottom: 8 }}>
+      {/* Delete button revealed by left swipe */}
+      <div
+        onClick={confirmDelete}
+        style={{
+          position: 'absolute', right: 0, top: 0, bottom: 0, width: 80,
+          backgroundColor: '#C44536', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', cursor: 'pointer',
+          borderRadius: '0 16px 16px 0',
+        }}
+      >
+        <span style={{ color: 'white', fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14 }}>
+          Delete
+        </span>
+      </div>
+
+      {/* Swipeable row content */}
+      <div
+        {...handlers}
+        onClick={() => { if (!swiped) onTap(log.id); else setSwiped(false); }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          display: 'flex', gap: 12, alignItems: 'center',
+          backgroundColor: 'white', borderRadius: 16,
+          border: '1px solid #E8E4D9', padding: 12,
+          transform: swiped ? 'translateX(-80px)' : 'translateX(0)',
+          transition: 'transform 0.2s ease',
+          cursor: 'pointer', position: 'relative',
+        }}
+      >
+        {/* Photo thumbnail */}
+        {log.image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={log.image_url}
+            alt={log.meal_name ?? ''}
+            style={{ width: 60, height: 60, borderRadius: 12, objectFit: 'cover', flexShrink: 0 }}
+          />
+        ) : (
+          <div style={{
+            width: 60, height: 60, borderRadius: 12, backgroundColor: '#F8F5EC',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0, fontSize: 22, color: '#6B7066',
+          }}>
+            📷
+          </div>
+        )}
+
+        {/* Text */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{
+            fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14,
+            color: '#1A1A1A', overflow: 'hidden', textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap', marginBottom: 2,
+          }}>
+            {log.meal_name ?? 'Meal'}
+          </p>
+          {itemCount !== null && (
+            <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 12, color: '#6B7066', marginBottom: 4 }}>
+              {itemCount} {itemCount === 1 ? 'item' : 'items'}
+            </p>
+          )}
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {([
+              log.calories  != null ? `${Math.round(log.calories)} cal`       : null,
+              log.protein_g != null ? `${Math.round(log.protein_g)}g pro`     : null,
+              log.carbs_g   != null ? `${Math.round(log.carbs_g)}g carb`      : null,
+            ] as (string | null)[]).filter(Boolean).map(label => (
+              <span key={label!} style={{
+                borderRadius: 10, padding: '3px 8px',
+                backgroundColor: '#D9ECE0',
+                fontFamily: 'Lato, sans-serif', fontSize: 12, color: '#1E8A4F',
+              }}>
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Desktop hover trash */}
+        {hovered && !swiped && (
+          <button
+            onClick={confirmDelete}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: '#C44536', fontSize: 18, padding: '0 4px', flexShrink: 0,
+            }}
+            aria-label="Delete meal"
+          >
+            🗑
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function MacrosPage() {
   const { user, profile } = useAuth();
   const supabase = createClient();
+  const router = useRouter();
 
   const isPro = profile?.subscription_tier === 'member' || profile?.subscription_tier === 'subscriber';
   const trialActive = profile?.pro_trial_ends_at
@@ -360,6 +485,13 @@ export default function MacrosPage() {
     setSaving(false);
   };
 
+  const handleDeleteMeal = async (id: string) => {
+    if (!user) return;
+    const { error } = await supabase.from('food_logs').delete().eq('id', id).eq('user_id', user.id);
+    if (error) { console.error('deleteMeal error:', error); return; }
+    await loadTodayLogs();
+  };
+
   const totalCalories = todayLogs.reduce((s, l) => s + (l.calories ?? 0), 0);
   const totalProtein  = todayLogs.reduce((s, l) => s + (l.protein_g ?? 0), 0);
   const totalCarbs    = todayLogs.reduce((s, l) => s + (l.carbs_g ?? 0), 0);
@@ -629,55 +761,14 @@ export default function MacrosPage() {
           </p>
         )}
 
-        {todayLogs.map((log, i) => {
-          const itemCount = Array.isArray(log.final_payload?.items) ? log.final_payload.items.length : null;
-          return (
-            <div key={log.id} style={{
-              display: 'flex', gap: 12, padding: '12px 0',
-              borderBottom: i < todayLogs.length - 1 ? '1px solid var(--border)' : 'none',
-            }}>
-              {log.image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={log.image_url} alt={log.meal_name ?? ''} style={{ width: 54, height: 54, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
-              ) : (
-                <div style={{ width: 54, height: 54, borderRadius: 8, backgroundColor: 'var(--primary-pale)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 22 }}>
-                  🍽
-                </div>
-              )}
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                  <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>
-                    {log.meal_name ?? 'Meal'}
-                  </p>
-                  {itemCount && itemCount > 1 && (
-                    <span style={{
-                      fontFamily: 'Lato, sans-serif', fontSize: 11, color: 'var(--primary)',
-                      backgroundColor: 'var(--primary-pale)', borderRadius: 10,
-                      padding: '1px 7px',
-                    }}>
-                      {itemCount} items
-                    </span>
-                  )}
-                </div>
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>
-                  {[
-                    log.calories   ? `${Math.round(log.calories)} cal`       : null,
-                    log.protein_g  ? `${Math.round(log.protein_g)}g protein` : null,
-                    log.carbs_g    ? `${Math.round(log.carbs_g)}g carbs`     : null,
-                  ].filter(Boolean).join(' · ')}
-                </p>
-                {log.confidence === 'low' && (
-                  <p style={{ fontSize: 11, color: 'var(--accent)', fontFamily: 'Lato, sans-serif', marginTop: 2 }}>
-                    Estimate — portions are hard to judge from photos
-                  </p>
-                )}
-                <p style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', marginTop: 3 }}>
-                  {new Date(log.logged_at).toLocaleTimeString('en-NZ', { timeZone: 'Pacific/Auckland', hour: 'numeric', minute: '2-digit', hour12: true })}
-                </p>
-              </div>
-            </div>
-          );
-        })}
+        {todayLogs.map(log => (
+          <MealRow
+            key={log.id}
+            log={log}
+            onDelete={handleDeleteMeal}
+            onTap={id => router.push(`/macros/${id}`)}
+          />
+        ))}
       </div>
 
       {/* Hidden file inputs */}

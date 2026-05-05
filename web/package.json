@@ -1,6 +1,6 @@
 {
   "name": "fastwell-web",
-  "version": "2.8.23",
+  "version": "2.8.24",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3001",
@@ -15,7 +15,8 @@
     "@supabase/supabase-js": "^2.103.2",
     "next": "^15",
     "react": "^19",
-    "react-dom": "^19"
+    "react-dom": "^19",
+    "react-swipeable": "^7.0.2"
   },
   "devDependencies": {
     "@types/node": "^20",
