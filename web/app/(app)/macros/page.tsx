@@ -50,6 +50,26 @@ function dateLabelNZ() {
   });
 }
 
+// Returns UTC ISO bounds that cover the full Pacific/Auckland calendar day for nzDateStr.
+// Needed because logged_at is TIMESTAMPTZ (UTC) but we want to filter by NZ calendar date.
+function nzDayBoundsUTC(nzDateStr: string): { gte: string; lte: string } {
+  const utcMidnight = new Date(`${nzDateStr}T00:00:00.000Z`);
+  const parts = new Intl.DateTimeFormat('en', {
+    timeZone: 'Pacific/Auckland',
+    hour: '2-digit', minute: '2-digit',
+    hour12: false,
+  }).formatToParts(utcMidnight);
+  const h = parseInt(parts.find(p => p.type === 'hour')?.value ?? '12', 10);
+  const m = parseInt(parts.find(p => p.type === 'minute')?.value ?? '0', 10);
+  // h is the NZ hour when it's UTC midnight. NZ midnight = UTC midnight - h hours - m minutes.
+  const adjustedH = h === 24 ? 0 : h;
+  const nzMidnightMs = utcMidnight.getTime() - adjustedH * 3_600_000 - m * 60_000;
+  return {
+    gte: new Date(nzMidnightMs).toISOString(),
+    lte: new Date(nzMidnightMs + 24 * 3_600_000 - 1).toISOString(),
+  };
+}
+
 export default function MacrosPage() {
   const { user, profile } = useAuth();
   const supabase = createClient();
@@ -87,20 +107,20 @@ export default function MacrosPage() {
   const [editFat, setEditFat] = useState('');
   const [editFibre, setEditFibre] = useState('');
 
-  const today = todayNZ();
-
   const loadTodayLogs = useCallback(async () => {
     if (!user) return;
-    try {
-      const { data } = await supabase.from('food_logs').select('*')
-        .eq('user_id', user.id)
-        .gte('logged_at', `${today}T00:00:00Z`)
-        .lte('logged_at', `${today}T23:59:59Z`)
-        .order('logged_at', { ascending: false });
-      setTodayLogs(data ?? []);
-    } catch {}
+    const { gte, lte } = nzDayBoundsUTC(todayNZ());
+    const { data, error } = await supabase
+      .from('food_logs')
+      .select('*')
+      .eq('user_id', user.id)
+      .gte('logged_at', gte)
+      .lte('logged_at', lte)
+      .order('logged_at', { ascending: false });
+    if (error) console.error('loadTodayLogs error:', error);
+    setTodayLogs(data ?? []);
     setLoadingLogs(false);
-  }, [user, today]);
+  }, [user]);
 
   useEffect(() => { loadTodayLogs(); }, [loadTodayLogs]);
 
@@ -224,7 +244,7 @@ export default function MacrosPage() {
       const totalFat      = currentResult.items.reduce((s, i) => s + i.fat_g, 0);
       const totalFibre    = currentResult.items.reduce((s, i) => s + i.fibre_g, 0);
 
-      await supabase.from('food_logs').insert({
+      const { error: insertErr } = await supabase.from('food_logs').insert({
         user_id: user.id,
         meal_name: mealName,
         image_url: imageUrl,
@@ -239,11 +259,18 @@ export default function MacrosPage() {
         ai_corrections: corrections,
         final_payload: currentResult,
       });
+      if (insertErr) {
+        console.error('saveMeal insert error:', insertErr);
+        setSaving(false);
+        return;
+      }
       setCurrentResult(null); setOriginalResult(null); setCorrections([]);
       setImageBase64(null); setImagePreview(null); setAnalysisError(null);
       await loadTodayLogs();
-      if (user) checkAndAwardBadges(user.id).catch(() => {});
-    } catch {}
+      checkAndAwardBadges(user.id).catch(() => {});
+    } catch (e) {
+      console.error('saveMeal error:', e);
+    }
     setSaving(false);
   };
 
@@ -302,7 +329,7 @@ export default function MacrosPage() {
         { type: 'manual_edit', at: new Date().toISOString() },
       ];
 
-      await supabase.from('food_logs').insert({
+      const { error: insertErr } = await supabase.from('food_logs').insert({
         user_id: user.id,
         meal_name: manualName,
         image_url: imageUrl,
@@ -317,12 +344,19 @@ export default function MacrosPage() {
         ai_corrections: manualCorrections,
         final_payload: manualFinalPayload,
       });
+      if (insertErr) {
+        console.error('saveEditedMeal insert error:', insertErr);
+        setSaving(false);
+        return;
+      }
       setShowEditManual(false);
       setCurrentResult(null); setOriginalResult(null); setCorrections([]);
       setImageBase64(null); setImagePreview(null); setAnalysisError(null);
       await loadTodayLogs();
       checkAndAwardBadges(user.id).catch(() => {});
-    } catch {}
+    } catch (e) {
+      console.error('saveEditedMeal error:', e);
+    }
     setSaving(false);
   };
 
