@@ -8,13 +8,13 @@ import UpgradeModal from '@/components/UpgradeModal';
 import { checkAndAwardBadges } from '@/lib/checkBadges';
 import { useSwipeable } from 'react-swipeable';
 import { DateScroller } from '@/app/components/DateScroller';
-import { todayNZ, nzDayBoundsUTC } from '@/lib/dateNZ';
+import { todayNZ, nzDayBoundsUTC, deriveMealCategory } from '@/lib/dateNZ';
 
 interface FoodLog {
   id: string; meal_name: string | null; image_url: string | null;
   calories: number | null; protein_g: number | null; carbs_g: number | null;
   fat_g: number | null; fibre_g: number | null; confidence: string | null;
-  notes: string | null; logged_at: string;
+  notes: string | null; logged_at: string; meal_category: string | null;
   final_payload?: { items?: Array<unknown> } | null;
 }
 
@@ -48,6 +48,11 @@ function dateLabelNZ() {
   return new Date().toLocaleDateString('en-NZ', {
     timeZone: 'Pacific/Auckland', weekday: 'long', day: 'numeric', month: 'long',
   });
+}
+
+function categoryLabel(cat: string | null): string | null {
+  if (!cat) return null;
+  return cat.charAt(0).toUpperCase() + cat.slice(1);
 }
 
 function MealRow({ log, onDelete, onTap }: {
@@ -125,13 +130,24 @@ function MealRow({ log, onDelete, onTap }: {
 
         {/* Text */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{
-            fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14,
-            color: '#1A1A1A', overflow: 'hidden', textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap', marginBottom: 2,
-          }}>
-            {log.meal_name ?? 'Meal'}
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+            <p style={{
+              fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14,
+              color: '#1A1A1A', overflow: 'hidden', textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap', minWidth: 0,
+            }}>
+              {log.meal_name ?? 'Meal'}
+            </p>
+            {categoryLabel(log.meal_category) && (
+              <span style={{
+                flexShrink: 0, borderRadius: 8, padding: '2px 8px',
+                backgroundColor: '#F8F5EC',
+                fontFamily: 'Lato, sans-serif', fontSize: 11, color: '#6B7066',
+              }}>
+                {categoryLabel(log.meal_category)}
+              </span>
+            )}
+          </div>
           {itemCount !== null && (
             <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 12, color: '#6B7066', marginBottom: 4 }}>
               {itemCount} {itemCount === 1 ? 'item' : 'items'}
@@ -367,6 +383,7 @@ export default function MacrosPage() {
         ai_original_payload: originalResult,
         ai_corrections: corrections,
         final_payload: currentResult,
+        meal_category: deriveMealCategory(new Date()),
       });
       if (insertErr) {
         console.error('saveMeal insert error:', insertErr);
@@ -457,6 +474,7 @@ export default function MacrosPage() {
         ai_original_payload: originalResult ?? null,
         ai_corrections: manualCorrections,
         final_payload: manualFinalPayload,
+        meal_category: deriveMealCategory(new Date()),
       });
       if (insertErr) {
         console.error('saveEditedMeal insert error:', insertErr);

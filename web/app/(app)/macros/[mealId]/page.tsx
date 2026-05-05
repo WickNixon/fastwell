@@ -35,6 +35,7 @@ interface FoodLog {
   confidence: string | null;
   notes: string | null;
   logged_at: string;
+  meal_category: string | null;
   final_payload: FinalPayload | null;
   ai_original_payload: unknown;
   ai_corrections: unknown[];
@@ -421,9 +422,19 @@ export default function MealDetailPage() {
           }}>
             {meal.meal_name ?? 'Meal'}
           </p>
-          <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: '#6B7066', marginBottom: 20 }}>
+          <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: '#6B7066', marginBottom: meal.meal_category ? 8 : 20 }}>
             Logged at {loggedAtTime}
           </p>
+          {meal.meal_category && (
+            <span style={{
+              display: 'inline-block', marginBottom: 20,
+              borderRadius: 10, padding: '3px 10px',
+              backgroundColor: '#D9ECE0',
+              fontFamily: 'Lato, sans-serif', fontSize: 12, color: '#1E8A4F',
+            }}>
+              {meal.meal_category.charAt(0).toUpperCase() + meal.meal_category.slice(1)}
+            </span>
+          )}
 
           {/* TOTALS */}
           <p style={SECTION_LABEL}>Totals</p>
