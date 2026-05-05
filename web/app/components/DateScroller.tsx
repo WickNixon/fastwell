@@ -75,7 +75,7 @@ export function DateScroller({
               }}>
                 <span style={{
                   fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 13,
-                  color: isSelected ? '#FFFFFF' : isToday ? '#1E8A4F' : hasData ? '#1E8A4F' : '#E8E4D9',
+                  color: isSelected ? '#FFFFFF' : isToday ? '#1E8A4F' : hasData ? '#1E8A4F' : '#6B7066',
                 }}>
                   {d.getDate()}
                 </span>
