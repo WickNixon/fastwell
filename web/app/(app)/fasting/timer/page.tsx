@@ -233,9 +233,7 @@ export default function FastingTimerPage() {
       .from('fasting_sessions')
       .update({
         ended_at: endedAt,
-        status: 'complete',
         duration_minutes: durationMins,
-        duration_hours: durationHrs,
         completion_celebrated: true,
       })
       .eq('id', sessionId)
