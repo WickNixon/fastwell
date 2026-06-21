@@ -444,7 +444,7 @@ function HabitCard({
   // State 1: 0%, not ticked  → white, no fill, empty circle
   // State 2: 1–99%, not ticked → white, partial fill, empty circle (tappable)
   // State 3: 100% OR manually ticked → full green fill, green circle
-  const effectiveDone = progress >= 100;
+  const effectiveDone = done || progress >= 100;
   return (
     <div
       style={{
@@ -1049,11 +1049,15 @@ export default function DashboardPage() {
     setTodayChecked(prev => new Set([...prev, habit.key]));
     setCompletedDates(prev => new Set([...prev, today]));
     // Save to Supabase immediately — don't wait for memo
+    // Write goalNum when nothing is logged yet so trends get a meaningful value.
+    // If a real value already exists (e.g. 6.5h logged on Sleep track page), keep
+    // value: 1 to avoid inflating the accumulated total in fetchDayData.
+    const valueToWrite = actualValue > 0 ? 1 : goalNum;
     const { error } = await supabase.from('health_entries').upsert({
       user_id: user.id,
       entry_date: today,
       metric: habit.key,
-      value: 1,
+      value: valueToWrite,
       unit: 'check',
       source: 'manual',
     }, { onConflict: 'user_id,entry_date,metric,source' });
