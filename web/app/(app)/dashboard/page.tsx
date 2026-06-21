@@ -1049,10 +1049,14 @@ export default function DashboardPage() {
     setTodayChecked(prev => new Set([...prev, habit.key]));
     setCompletedDates(prev => new Set([...prev, today]));
     // Save to Supabase immediately — don't wait for memo
-    // Write goalNum when nothing is logged yet so trends get a meaningful value.
-    // If a real value already exists (e.g. 6.5h logged on Sleep track page), keep
-    // value: 1 to avoid inflating the accumulated total in fetchDayData.
-    const valueToWrite = actualValue > 0 ? 1 : goalNum;
+    // The tick row (metric=habit.key, unit='check') and any real-value row
+    // (e.g. metric='sleep_hours') both accumulate into values[habitKey] in
+    // fetchDayData. Writing (goalNum - actualValue) makes the day total land
+    // exactly on goal: actualValue + (goalNum - actualValue) = goalNum.
+    // Case 1 (nothing logged): 8 - 0 = 8 → total 8. ✓
+    // Case 2 (partial 6.5h): 8 - 6.5 = 1.5 → total 8. ✓
+    // Case 3 (already ≥ goal): blocked by the early-return above, never reached.
+    const valueToWrite = goalNum - actualValue;
     const { error } = await supabase.from('health_entries').upsert({
       user_id: user.id,
       entry_date: today,
