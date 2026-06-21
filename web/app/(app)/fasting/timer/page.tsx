@@ -56,13 +56,14 @@ function BiomarkerLogSheet({
     const num = parseFloat(value);
     if (isNaN(num) || num <= 0) return;
     setSaving(true);
-    await getSupabase().from('biomarkers').insert({
+    const { error } = await getSupabase().from('biomarkers').insert({
       user_id: userId,
       marker: type,
       value: num,
       unit,
-      recorded_at: new Date().toISOString(),
+      reading_date: new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' }),
     });
+    if (error) console.error('biomarker insert (timer):', error);
     setSaved(true);
     setTimeout(onClose, 800);
   };
