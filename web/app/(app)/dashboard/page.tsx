@@ -720,7 +720,6 @@ function getHabitProgress(
 export default function DashboardPage() {
   const { profile, user } = useAuth();
   const supabase = createClient();
-  console.log('[DIAG] createClient called (render)');
   const router = useRouter();
   const today = isoDate(new Date());
 
@@ -825,7 +824,6 @@ export default function DashboardPage() {
   useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
 
   const fetchDayData = useCallback(async (date: string) => {
-    console.log('[DIAG] fetchDayData fired', { date, stack: new Error().stack });
     if (!profile) return;
     try {
       const [{ data: entries, error: fetchError }, { data: symptomsData }] = await Promise.all([
@@ -859,13 +857,11 @@ export default function DashboardPage() {
       setTodayEntries(entrySet);
       setTodayChecked(checkedSet);
       setTodayMemos(memos);
-      console.log('[DIAG] fetchDayData setting values', values);
       setTodayValues(values);
     } catch {}
   }, [profile]);
 
   const load = useCallback(async () => {
-    console.log('[DIAG] load() fired');
     if (!profile) return;
     const sb = getSupabase();
 
