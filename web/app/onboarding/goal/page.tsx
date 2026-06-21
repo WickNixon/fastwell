@@ -20,16 +20,24 @@ export default function OnboardingGoalPage() {
   const router = useRouter();
   const [selected, setSelected] = useState('');
   const [loading, setLoading] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const name = profile?.first_name ?? 'there';
 
   const handleContinue = async () => {
     if (!selected || !user) return;
     setLoading(true);
-    await getSupabase()
+    setSaveError('');
+    const { error } = await getSupabase()
       .from('profiles')
       .update({ primary_goal: selected, onboarding_complete: true })
       .eq('id', user.id);
+    if (error) {
+      console.error('onboarding goal save:', error);
+      setSaveError("Something went wrong — your progress hasn't saved. Please try again.");
+      setLoading(false);
+      return;
+    }
     router.push('/onboarding/complete');
   };
 
@@ -60,6 +68,9 @@ export default function OnboardingGoalPage() {
         </div>
 
         <div style={{ marginTop: 'auto' }}>
+          {saveError && (
+            <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: '#C62828', marginBottom: 12, textAlign: 'center' }}>{saveError}</p>
+          )}
           <button
             className="btn btn-primary"
             disabled={!selected || loading}

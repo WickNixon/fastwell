@@ -18,12 +18,21 @@ export default function OnboardingStagePage() {
   const router = useRouter();
   const [selected, setSelected] = useState('');
   const [loading, setLoading] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const handleSelect = async (key: string) => {
     if (!user) return;
     setSelected(key);
     setLoading(true);
-    await getSupabase().from('profiles').update({ menopause_stage: key }).eq('id', user.id);
+    setSaveError('');
+    const { error } = await getSupabase().from('profiles').update({ menopause_stage: key }).eq('id', user.id);
+    if (error) {
+      console.error('onboarding stage save:', error);
+      setSaveError('Something went wrong. Please tap your choice again.');
+      setSelected('');
+      setLoading(false);
+      return;
+    }
     const next = key === 'post_menopause' ? '/onboarding/hrt' : '/onboarding/cycle';
     setTimeout(() => router.push(next), 600);
   };
@@ -53,6 +62,9 @@ export default function OnboardingStagePage() {
             </div>
           </button>
         ))}
+        {saveError && (
+          <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: '#C62828', textAlign: 'center', marginTop: 4 }}>{saveError}</p>
+        )}
       </div>
     </div>
   );

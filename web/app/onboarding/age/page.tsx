@@ -11,6 +11,7 @@ export default function OnboardingAgePage() {
   const router = useRouter();
   const [age, setAge] = useState(52);
   const [loading, setLoading] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     if (profile?.age && profile.age >= 18 && profile.age <= 97) {
@@ -23,7 +24,14 @@ export default function OnboardingAgePage() {
   const handleContinue = async () => {
     if (!user) return;
     setLoading(true);
-    await getSupabase().from('profiles').update({ age }).eq('id', user.id);
+    setSaveError('');
+    const { error } = await getSupabase().from('profiles').update({ age }).eq('id', user.id);
+    if (error) {
+      console.error('onboarding age save:', error);
+      setSaveError('Something went wrong saving your age. Please try again.');
+      setLoading(false);
+      return;
+    }
     router.push('/onboarding/stage');
   };
 
@@ -60,6 +68,9 @@ export default function OnboardingAgePage() {
         <AgeTumbler value={age} onChange={handleChange} />
 
         <div style={{ marginTop: 'auto', paddingTop: 32 }}>
+          {saveError && (
+            <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: '#C62828', marginBottom: 12, textAlign: 'center' }}>{saveError}</p>
+          )}
           <button
             className="btn btn-primary"
             onClick={handleContinue}

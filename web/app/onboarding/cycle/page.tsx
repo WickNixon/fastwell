@@ -18,15 +18,23 @@ export default function OnboardingCyclePage() {
   const [selected, setSelected] = useState('');
   const [cycleLength, setCycleLength] = useState('28');
   const [loading, setLoading] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const handleContinue = async () => {
     if (!selected || !user) return;
     setLoading(true);
+    setSaveError('');
     const update: Record<string, unknown> = { has_regular_cycle: selected };
     if (selected === 'yes_regular' && cycleLength) {
       update.cycle_length_days = parseInt(cycleLength);
     }
-    await getSupabase().from('profiles').update(update).eq('id', user.id);
+    const { error } = await getSupabase().from('profiles').update(update).eq('id', user.id);
+    if (error) {
+      console.error('onboarding cycle save:', error);
+      setSaveError('Something went wrong. Please try again.');
+      setLoading(false);
+      return;
+    }
     router.push('/onboarding/hrt');
   };
 
@@ -70,6 +78,9 @@ export default function OnboardingCyclePage() {
         )}
 
         <div style={{ marginTop: 'auto' }}>
+          {saveError && (
+            <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: '#C62828', marginBottom: 12, textAlign: 'center' }}>{saveError}</p>
+          )}
           <button
             className="btn btn-primary"
             disabled={!selected || loading}

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
@@ -7,16 +8,20 @@ import { getSupabase } from '@/lib/supabase-browser';
 export default function OnboardingCompletePage() {
   const { profile, refreshProfile } = useAuth();
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
   const name = profile?.first_name ?? 'there';
 
   const handleGo = async () => {
+    if (loading) return;
+    setLoading(true);
     if (profile) {
-      await getSupabase().from('user_badges').upsert({
+      const { error } = await getSupabase().from('user_badges').upsert({
         user_id: profile.id,
         badge_key: 'you_showed_up',
         earned_at: new Date().toISOString(),
         seen: false,
       }, { onConflict: 'user_id,badge_key' });
+      if (error) console.error('onboarding badge upsert:', error);
     }
     await refreshProfile();
     router.push('/dashboard');
@@ -69,6 +74,7 @@ export default function OnboardingCompletePage() {
 
       <button
         onClick={handleGo}
+        disabled={loading}
         style={{
           width: '100%',
           height: 56,
@@ -79,17 +85,19 @@ export default function OnboardingCompletePage() {
           fontWeight: 600,
           fontSize: 16,
           border: 'none',
-          cursor: 'pointer',
+          cursor: loading ? 'not-allowed' : 'pointer',
           marginBottom: 16,
           boxShadow: '0 6px 14px rgba(226,104,42,0.35)',
+          opacity: loading ? 0.7 : 1,
         }}
       >
-        Let&apos;s personalise it.
+        {loading ? 'Setting up…' : "Let's personalise it."}
       </button>
 
       <button
         onClick={handleGo}
-        style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', fontFamily: 'Lato, sans-serif', fontSize: 13, cursor: 'pointer' }}
+        disabled={loading}
+        style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', fontFamily: 'Lato, sans-serif', fontSize: 13, cursor: loading ? 'not-allowed' : 'pointer' }}
       >
         Skip for now.
       </button>

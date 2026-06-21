@@ -17,12 +17,21 @@ export default function OnboardingHrtPage() {
   const router = useRouter();
   const [selected, setSelected] = useState('');
   const [loading, setLoading] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const handleSelect = async (key: string) => {
     if (!user) return;
     setSelected(key);
     setLoading(true);
-    await getSupabase().from('profiles').update({ on_hrt: key }).eq('id', user.id);
+    setSaveError('');
+    const { error } = await getSupabase().from('profiles').update({ on_hrt: key }).eq('id', user.id);
+    if (error) {
+      console.error('onboarding hrt save:', error);
+      setSaveError('Something went wrong. Please tap your choice again.');
+      setSelected('');
+      setLoading(false);
+      return;
+    }
     setTimeout(() => router.push('/onboarding/goal'), 600);
   };
 
@@ -48,6 +57,9 @@ export default function OnboardingHrtPage() {
             <div className="choice-title">{o.title}</div>
           </button>
         ))}
+        {saveError && (
+          <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: '#C62828', textAlign: 'center', marginTop: 4 }}>{saveError}</p>
+        )}
       </div>
     </div>
   );

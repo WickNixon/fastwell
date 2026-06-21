@@ -11,12 +11,20 @@ export default function OnboardingNamePage() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const handleContinue = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !user) return;
     setLoading(true);
-    await getSupabase().from('profiles').update({ first_name: name.trim() }).eq('id', user.id);
+    setSaveError('');
+    const { error } = await getSupabase().from('profiles').update({ first_name: name.trim() }).eq('id', user.id);
+    if (error) {
+      console.error('onboarding name save:', error);
+      setSaveError('Something went wrong saving your name. Please try again.');
+      setLoading(false);
+      return;
+    }
     router.push('/onboarding/age');
   };
 
@@ -44,6 +52,9 @@ export default function OnboardingNamePage() {
         </div>
 
         <div style={{ marginTop: 'auto' }}>
+          {saveError && (
+            <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: '#C62828', marginBottom: 12, textAlign: 'center' }}>{saveError}</p>
+          )}
           <button
             type="submit"
             className="btn btn-primary"
