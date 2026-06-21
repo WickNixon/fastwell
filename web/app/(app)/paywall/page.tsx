@@ -73,7 +73,7 @@ export default function PaywallPage() {
   const [fastCount, setFastCount] = useState(0);
   const [badgeCount, setBadgeCount] = useState(0);
 
-  const isMember = profile?.subscription_tier === 'member';
+  const isMember = profile?.subscription_tier === 'member_pro';
 
   useEffect(() => {
     if (!profile) return;
@@ -102,7 +102,7 @@ export default function PaywallPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-checkout-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ plan: planMap[selected], tier: profile?.subscription_tier ?? 'subscriber' }),
+        body: JSON.stringify({ plan: planMap[selected], tier: profile?.subscription_tier ?? 'free' }),
       });
       const { url } = await res.json();
       if (url) window.location.href = url;

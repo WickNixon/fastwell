@@ -73,7 +73,7 @@ export default function ChoosePlanPage() {
   const [selected, setSelected] = useState<PlanKey>('monthly');
   const [loading, setLoading] = useState(false);
 
-  const isMember = profile?.subscription_tier === 'member';
+  const isMember = profile?.subscription_tier === 'member_pro';
 
   const getPrice = (plan: PlanDef) => isMember ? plan.memberPriceLabel : plan.priceLabel;
 
@@ -91,7 +91,7 @@ export default function ChoosePlanPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-checkout-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ plan: planMap[selected], tier: profile?.subscription_tier ?? 'subscriber' }),
+        body: JSON.stringify({ plan: planMap[selected], tier: profile?.subscription_tier ?? 'free' }),
       });
       const { url } = await res.json();
       if (url) window.location.href = url;

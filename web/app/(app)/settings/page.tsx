@@ -17,7 +17,7 @@ export default function SettingsPage() {
     <div className="page page-top">
       <h1 className="h1 mb-4">Settings</h1>
       <p className="body-sm mb-24">
-        {profile?.first_name ?? ''} · {profile?.subscription_tier === 'member' ? 'Wicked Wellbeing member' : profile?.subscription_tier === 'subscriber' ? 'Fastwell subscriber' : 'Free plan'}
+        {profile?.first_name ?? ''} · {profile?.subscription_tier === 'member_pro' ? 'Wicked Wellbeing member' : profile?.subscription_tier === 'pro' ? 'Fastwell subscriber' : 'Free plan'}
       </p>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 24 }}>

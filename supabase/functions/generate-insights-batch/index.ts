@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
       .from('profiles')
       .select('id')
       .in('subscription_status', ['trialing', 'active'])
-      .neq('subscription_tier', 'inactive')
+      .neq('subscription_tier', 'free')
       .limit(50);
 
     if (error) throw error;

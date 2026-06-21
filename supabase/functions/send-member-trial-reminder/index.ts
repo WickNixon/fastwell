@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
     const { data: members, error } = await supabase
       .from('profiles')
       .select('id, first_name, trial_ends_at')
-      .eq('subscription_tier', 'member')
+      .eq('subscription_tier', 'member_pro')
       .eq('trial_reminder_sent', false)
       .gte('trial_ends_at', windowStart.toISOString())
       .lte('trial_ends_at', windowEnd.toISOString());

@@ -193,7 +193,7 @@ export default function MacrosPage() {
   const supabase = createClient();
   const router = useRouter();
 
-  const isPro = profile?.subscription_tier === 'member' || profile?.subscription_tier === 'subscriber';
+  const isPro = profile?.subscription_tier === 'member_pro' || profile?.subscription_tier === 'pro';
   const trialActive = profile?.pro_trial_ends_at
     ? new Date(profile.pro_trial_ends_at) > new Date()
     : false;

@@ -29,9 +29,9 @@ Deno.serve(async (req) => {
     active30,
   ] = await Promise.all([
     supabase.from('profiles').select('id', { count: 'exact', head: true }),
-    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('subscription_tier', 'member'),
-    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('subscription_tier', 'subscriber'),
-    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('subscription_tier', 'inactive'),
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('subscription_tier', 'member_pro'),
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('subscription_tier', 'pro'),
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('subscription_tier', 'free'),
     supabase.from('invite_tokens').select('id', { count: 'exact', head: true }).eq('is_used', false).gt('expires_at', new Date().toISOString()),
     supabase.from('user_badges').select('id', { count: 'exact', head: true }),
     supabase.from('user_badges').select('badge_key').limit(1000),
@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
   const { data: quietUsers } = await supabase
     .from('profiles')
     .select('id, first_name, updated_at')
-    .neq('subscription_tier', 'inactive')
+    .neq('subscription_tier', 'free')
     .order('updated_at', { ascending: true })
     .limit(20);
 

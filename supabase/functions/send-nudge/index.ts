@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
       const { data: rows } = await supabase
         .from('profiles')
         .select('id, push_token')
-        .neq('subscription_tier', 'inactive');
+        .neq('subscription_tier', 'free');
       targets = rows ?? [];
     } else if (target === 'user' && user_id) {
       const { data: row } = await supabase
