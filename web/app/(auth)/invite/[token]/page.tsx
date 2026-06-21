@@ -102,7 +102,7 @@ export default function InvitePage() {
       email,
       password,
       options: {
-        data: { subscription_tier: 'member', invite_token: token },
+        data: { subscription_tier: 'member_pro', invite_token: token },
       },
     });
 

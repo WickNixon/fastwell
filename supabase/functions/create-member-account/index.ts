@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
     // Update profile
     await supabase.from('profiles').upsert({
       id: userId,
-      subscription_tier: 'member',
+      subscription_tier: 'member_pro',
       subscription_status: 'trialing',
       trial_ends_at: trialEndsAt.toISOString(),
       stripe_customer_id: customer.id,

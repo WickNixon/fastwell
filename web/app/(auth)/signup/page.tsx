@@ -78,7 +78,7 @@ export default function SignupPage() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { subscription_tier: 'subscriber' } },
+      options: { data: { subscription_tier: 'free' } },
     });
     if (error) {
       setError(error.message);
