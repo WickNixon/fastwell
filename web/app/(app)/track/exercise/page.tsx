@@ -280,7 +280,7 @@ export default function TrackExercisePage() {
         {saving ? 'Saving…' : `Log ${duration ? `${duration}m` : 'exercise'}`}
       </button>
 
-      {/* Edit Today */}
+      {/* Edit Today / Undo Today */}
       {todayTotal > 0 && (
         <div style={{ marginTop: 10 }}>
           {editingToday ? (
@@ -309,28 +309,24 @@ export default function TrackExercisePage() {
               >✕</button>
             </div>
           ) : (
-            <button
-              className="btn btn-outline"
-              onClick={() => { setEditingToday(true); setEditValue(String(todayTotal)); setUndoConfirm(false); }}
-              style={{ width: '100%' }}
-            >
-              Edit Today
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="btn btn-outline"
+                onClick={() => { setEditingToday(true); setEditValue(String(todayTotal)); setUndoConfirm(false); }}
+                style={{ flex: 1 }}
+              >
+                Edit Today
+              </button>
+              <button
+                className="btn btn-outline"
+                onClick={handleUndo}
+                disabled={undoSaving}
+                style={{ flex: 1, color: undoConfirm ? '#C62828' : undefined, borderColor: undoConfirm ? '#C62828' : undefined }}
+              >
+                {undoSaving ? 'Clearing…' : undoConfirm ? 'Tap again to confirm' : 'Undo Today'}
+              </button>
+            </div>
           )}
-        </div>
-      )}
-
-      {/* Undo Today */}
-      {todayTotal > 0 && (
-        <div style={{ marginTop: 10 }}>
-          <button
-            className="btn btn-outline"
-            onClick={handleUndo}
-            disabled={undoSaving}
-            style={{ width: '100%', color: undoConfirm ? '#C62828' : undefined, borderColor: undoConfirm ? '#C62828' : undefined }}
-          >
-            {undoSaving ? 'Clearing…' : undoConfirm ? 'Tap again to confirm' : 'Undo Today'}
-          </button>
         </div>
       )}
     </div>
