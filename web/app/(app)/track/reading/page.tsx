@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
@@ -32,6 +32,13 @@ export default function TrackReadingPage() {
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
+  const [editingToday, setEditingToday] = useState(false);
+  const [editValue, setEditValue] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [undoConfirm, setUndoConfirm] = useState(false);
+  const [undoSaving, setUndoSaving] = useState(false);
+  const undoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const load = useCallback(async () => {
     if (!profile) return;
     const past = new Date(); past.setDate(past.getDate() - 6);
@@ -44,7 +51,7 @@ export default function TrackReadingPage() {
     ]);
     setHistory(entries ?? []);
     const todayEntry = (entries ?? []).find(e => e.entry_date === TODAY);
-    if (todayEntry?.value) setTodayTotal(todayEntry.value);
+    setTodayTotal(todayEntry?.value ?? 0);
     if (profileData?.custom_habits) {
       const ch = profileData.custom_habits as Record<string, { goal: number; unit: string }>;
       setCustomHabitsDb(ch);
@@ -53,6 +60,8 @@ export default function TrackReadingPage() {
   }, [profile, TODAY]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => () => { if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current); }, []);
 
   const save = async () => {
     if (!duration || !user || saving) return;
@@ -84,6 +93,55 @@ export default function TrackReadingPage() {
       return;
     }
     setFeedback({ ok: true, msg: 'Deleted' });
+    setTimeout(() => setFeedback(null), 1500);
+    await load();
+  };
+
+  const handleEditSet = async () => {
+    const N = parseFloat(editValue);
+    if (!N || N <= 0 || !user) return;
+    setEditSaving(true);
+    setFeedback(null);
+    const { error } = await supabase.from('health_entries').upsert({
+      user_id: user.id, entry_date: TODAY,
+      metric: HABIT_KEY, value: N, unit: UNIT, source: 'manual',
+    }, { onConflict: 'user_id,entry_date,metric,source' });
+    if (error) {
+      console.error('Edit: upsert error:', error);
+      setFeedback({ ok: false, msg: 'Something went wrong. Please try again.' });
+      setEditSaving(false);
+      return;
+    }
+    setEditingToday(false);
+    setEditValue('');
+    setEditSaving(false);
+    setFeedback({ ok: true, msg: `Updated to ${N} mins` });
+    setTimeout(() => setFeedback(null), 2000);
+    await load();
+  };
+
+  const handleUndo = async () => {
+    if (!undoConfirm) {
+      setUndoConfirm(true);
+      undoTimeoutRef.current = setTimeout(() => setUndoConfirm(false), 4000);
+      return;
+    }
+    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+    if (!user) return;
+    setUndoSaving(true);
+    setFeedback(null);
+    const { error } = await supabase.from('health_entries').delete()
+      .eq('user_id', user.id).eq('entry_date', TODAY).eq('metric', HABIT_KEY);
+    if (error) {
+      console.error('Undo error:', error);
+      setFeedback({ ok: false, msg: 'Something went wrong. Please try again.' });
+      setUndoSaving(false);
+      setUndoConfirm(false);
+      return;
+    }
+    setUndoConfirm(false);
+    setUndoSaving(false);
+    setFeedback({ ok: true, msg: 'Cleared' });
     setTimeout(() => setFeedback(null), 1500);
     await load();
   };
@@ -158,6 +216,55 @@ export default function TrackReadingPage() {
           {saving ? 'Saving…' : 'Add session'}
         </button>
       </div>
+
+      {todayTotal > 0 && (
+        <div style={{ marginTop: 10 }}>
+          {editingToday ? (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                type="number"
+                className="input"
+                style={{ maxWidth: 90 }}
+                value={editValue}
+                onChange={e => setEditValue(e.target.value)}
+                placeholder={String(todayTotal)}
+                autoFocus
+                min={1}
+              />
+              <span style={{ color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', fontSize: 14 }}>mins</span>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleEditSet}
+                disabled={editSaving || !editValue}
+              >
+                {editSaving ? 'Saving…' : 'Set'}
+              </button>
+              <button
+                onClick={() => { setEditingToday(false); setEditValue(''); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 18, lineHeight: 1, padding: 2 }}
+              >✕</button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="btn btn-outline"
+                onClick={() => { setEditingToday(true); setEditValue(String(todayTotal)); setUndoConfirm(false); }}
+                style={{ flex: 1 }}
+              >
+                Edit Today
+              </button>
+              <button
+                className="btn btn-outline"
+                onClick={handleUndo}
+                disabled={undoSaving}
+                style={{ flex: 1, color: undoConfirm ? '#C62828' : undefined, borderColor: undoConfirm ? '#C62828' : undefined }}
+              >
+                {undoSaving ? 'Clearing…' : undoConfirm ? 'Tap again to confirm' : 'Undo Today'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {history.length > 0 && (
         <div className="section">
