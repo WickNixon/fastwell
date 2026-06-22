@@ -70,6 +70,20 @@ const HABIT_UNITS: Record<string, string> = {
   meditation: 'mins', reading: 'mins',
 };
 
+// Maps habit base key → the real-value metric + unit written by its track page.
+// Used by Option B tick: tick writes the real metric at goal value (one row, both
+// dashboard and inner screen read the same row and always agree).
+// Daily-tick habits (mood, energy, veggies, etc.) are intentionally absent here —
+// their real metrics are ambiguous or scale-based; they keep the legacy check-row path.
+const HABIT_REAL_METRIC: Record<string, { metric: string; unit: string }> = {
+  exercise:   { metric: 'exercise_minutes',   unit: 'minutes' },
+  sleep:      { metric: 'sleep_hours',        unit: 'hours'   },
+  water:      { metric: 'water_ml',           unit: 'ml'      },
+  walking:    { metric: 'steps',              unit: 'steps'   },
+  meditation: { metric: 'meditation_minutes', unit: 'mins'    },
+  reading:    { metric: 'reading_minutes',    unit: 'mins'    },
+};
+
 function goalToNumber(goal: string | undefined, habitKey: string): number {
   const defaults: Record<string, number> = {
     water: 2000, exercise: 30, sleep: 8, walking: 10000, meditation: 10, reading: 20,
@@ -847,7 +861,9 @@ export default function DashboardPage() {
           checkedSet.add(e.metric);
           values[e.metric] = (values[e.metric] ?? 0) + (e.value ?? 0);
         }
-        if (e.emoji || e.memo) memos[e.metric] = { emoji: e.emoji ?? null, memo: e.memo ?? null };
+        // Key memo by habitKey when mapped (so card lookup todayMemos[habit.key] finds it)
+        // or by raw metric for unmapped rows (sleep_quality, etc.)
+        if (e.emoji || e.memo) memos[habitKey ?? e.metric] = { emoji: e.emoji ?? null, memo: e.memo ?? null };
       }
       // Symptoms page writes to symptoms_log (not health_entries) — detect separately
       if ((symptomsData ?? []).length > 0) {
@@ -1048,21 +1064,19 @@ export default function DashboardPage() {
     setTodayEntries(prev => new Set([...prev, habit.key]));
     setTodayChecked(prev => new Set([...prev, habit.key]));
     setCompletedDates(prev => new Set([...prev, today]));
-    // Save to Supabase immediately — don't wait for memo
-    // The tick row (metric=habit.key, unit='check') and any real-value row
-    // (e.g. metric='sleep_hours') both accumulate into values[habitKey] in
-    // fetchDayData. Writing (goalNum - actualValue) makes the day total land
-    // exactly on goal: actualValue + (goalNum - actualValue) = goalNum.
-    // Case 1 (nothing logged): 8 - 0 = 8 → total 8. ✓
-    // Case 2 (partial 6.5h): 8 - 6.5 = 1.5 → total 8. ✓
-    // Case 3 (already ≥ goal): blocked by the early-return above, never reached.
-    const valueToWrite = goalNum - actualValue;
+    // Save to Supabase immediately — don't wait for memo.
+    // Option B: for numeric habits, write the real-value metric at goal so the
+    // inner habit screen (which reads the same metric) agrees with the dashboard.
+    // One row, no difference-to-goal check row, no accumulation risk.
+    // Daily-tick habits (mood, energy, etc.) keep the legacy check-row path
+    // because their real metrics are scale-based and unsuitable for a goal tick.
+    const realInfo = HABIT_REAL_METRIC[habit.key];
     const { error } = await supabase.from('health_entries').upsert({
       user_id: user.id,
       entry_date: today,
-      metric: habit.key,
-      value: valueToWrite,
-      unit: 'check',
+      metric: realInfo ? realInfo.metric : habit.key,
+      value: goalNum,
+      unit: realInfo ? realInfo.unit : 'check',
       source: 'manual',
     }, { onConflict: 'user_id,entry_date,metric,source' });
     if (error) {
@@ -1084,12 +1098,15 @@ export default function DashboardPage() {
     const habitKey = bottomSheet.key;
     setBottomSheet(null);
     const emojiChar = emojiIndex !== null ? MEMO_EMOJIS[emojiIndex - 1] : null;
-    // Always update — even if no emoji/memo, clears old values
+    // Always update — even if no emoji/memo, clears old values.
+    // Target the real-value metric row (e.g. exercise_minutes) for numeric habits
+    // so the memo is stored on the same row the tick wrote to under Option B.
+    const memoMetric = HABIT_REAL_METRIC[habitKey]?.metric ?? habitKey;
     const { error } = await supabase.from('health_entries')
       .update({ emoji: emojiChar, memo: memo || null })
       .eq('user_id', user.id)
       .eq('entry_date', today)
-      .eq('metric', habitKey)
+      .eq('metric', memoMetric)
       .eq('source', 'manual');
     if (!error && (emojiChar || memo)) {
       setTodayMemos(prev => ({ ...prev, [habitKey]: { emoji: emojiChar, memo: memo || null } }));
