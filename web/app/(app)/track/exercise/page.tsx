@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 
 const HABIT_KEY = 'exercise_minutes';
+const TICK_KEY = 'exercise';
 const DEFAULT_GOAL = 30;
 const TYPES = ['Walk', 'Run', 'Gym', 'Swim', 'Yoga', 'Cycle', 'Other'];
 const DURATIONS = [15, 20, 30, 45, 60, 90];
@@ -38,6 +39,16 @@ export default function TrackExercisePage() {
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
+  // Edit today state
+  const [editingToday, setEditingToday] = useState(false);
+  const [editValue, setEditValue] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Undo today state — two-tap inline confirm
+  const [undoConfirm, setUndoConfirm] = useState(false);
+  const [undoSaving, setUndoSaving] = useState(false);
+  const undoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const load = useCallback(async () => {
     if (!profile) return;
     const [{ data: entry }, { data: profileData }] = await Promise.all([
@@ -52,6 +63,8 @@ export default function TrackExercisePage() {
         setType(parts[0] ?? 'Walk');
         if (parts[1]) setIntensity(parts[1]);
       }
+    } else {
+      setTodayTotal(0);
     }
     if (profileData?.custom_habits) {
       const ch = profileData.custom_habits as Record<string, { goal: number; unit: string }>;
@@ -61,6 +74,9 @@ export default function TrackExercisePage() {
   }, [profile, TODAY]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Cancel undo confirm on unmount
+  useEffect(() => () => { if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current); }, []);
 
   const save = async () => {
     if (!duration || !user || saving) return;
@@ -81,6 +97,76 @@ export default function TrackExercisePage() {
       setTimeout(() => { setFeedback(null); }, 2000);
     }
     setSaving(false);
+  };
+
+  // SET today's value to an exact number N.
+  // Deletes the tick row first (guards on unit:'check' so only the tick row is
+  // removed), then upserts the real-value row with the new value. This prevents
+  // the double-counting that would occur if the tick row were left in place.
+  const handleEditSet = async () => {
+    const N = parseFloat(editValue);
+    if (!N || N <= 0 || !user) return;
+    setEditSaving(true);
+    setFeedback(null);
+
+    const { error: delError } = await supabase.from('health_entries').delete()
+      .eq('user_id', user.id).eq('entry_date', TODAY)
+      .eq('metric', TICK_KEY).eq('unit', 'check');
+    if (delError) {
+      console.error('Edit: tick delete error:', delError);
+      setFeedback({ ok: false, msg: 'Something went wrong. Please try again.' });
+      setEditSaving(false);
+      return;
+    }
+
+    const { error: upsertError } = await supabase.from('health_entries').upsert({
+      user_id: user.id, entry_date: TODAY,
+      metric: HABIT_KEY, value: N, unit: 'minutes', source: 'manual',
+    }, { onConflict: 'user_id,entry_date,metric,source' });
+    if (upsertError) {
+      console.error('Edit: upsert error:', upsertError);
+      setFeedback({ ok: false, msg: 'Something went wrong. Please try again.' });
+      setEditSaving(false);
+      return;
+    }
+
+    setEditingToday(false);
+    setEditValue('');
+    setEditSaving(false);
+    setFeedback({ ok: true, msg: `Updated to ${N} mins` });
+    setTimeout(() => setFeedback(null), 2000);
+    await load();
+  };
+
+  // CLEAR today's logging for this habit entirely.
+  // Deletes both the real-value row and the tick row so no stale value remains.
+  const handleUndo = async () => {
+    if (!undoConfirm) {
+      setUndoConfirm(true);
+      undoTimeoutRef.current = setTimeout(() => setUndoConfirm(false), 4000);
+      return;
+    }
+    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+    if (!user) return;
+    setUndoSaving(true);
+    setFeedback(null);
+
+    const { error } = await supabase.from('health_entries').delete()
+      .eq('user_id', user.id).eq('entry_date', TODAY)
+      .in('metric', [HABIT_KEY, TICK_KEY]);
+    if (error) {
+      console.error('Undo error:', error);
+      setFeedback({ ok: false, msg: 'Something went wrong. Please try again.' });
+      setUndoSaving(false);
+      setUndoConfirm(false);
+      return;
+    }
+
+    setUndoConfirm(false);
+    setUndoSaving(false);
+    setFeedback({ ok: true, msg: 'Cleared' });
+    setTimeout(() => setFeedback(null), 1500);
+    await load();
   };
 
   const saveGoal = async (newGoal: number) => {
@@ -210,6 +296,60 @@ export default function TrackExercisePage() {
       <button className="btn btn-primary" onClick={save} disabled={!duration || saving}>
         {saving ? 'Saving…' : `Log ${duration ? `${duration}m` : 'exercise'}`}
       </button>
+
+      {/* Edit Today */}
+      {todayTotal > 0 && (
+        <div style={{ marginTop: 10 }}>
+          {editingToday ? (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                type="number"
+                className="input"
+                style={{ maxWidth: 90 }}
+                value={editValue}
+                onChange={e => setEditValue(e.target.value)}
+                placeholder={String(todayTotal)}
+                autoFocus
+                min={1}
+              />
+              <span style={{ color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', fontSize: 14 }}>mins</span>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleEditSet}
+                disabled={editSaving || !editValue}
+              >
+                {editSaving ? 'Saving…' : 'Set'}
+              </button>
+              <button
+                onClick={() => { setEditingToday(false); setEditValue(''); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 18, lineHeight: 1, padding: 2 }}
+              >✕</button>
+            </div>
+          ) : (
+            <button
+              className="btn btn-outline"
+              onClick={() => { setEditingToday(true); setEditValue(String(todayTotal)); setUndoConfirm(false); }}
+              style={{ width: '100%' }}
+            >
+              Edit Today
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Undo Today */}
+      {todayTotal > 0 && (
+        <div style={{ marginTop: 10 }}>
+          <button
+            className="btn btn-outline"
+            onClick={handleUndo}
+            disabled={undoSaving}
+            style={{ width: '100%', color: undoConfirm ? '#C62828' : undefined, borderColor: undoConfirm ? '#C62828' : undefined }}
+          >
+            {undoSaving ? 'Clearing…' : undoConfirm ? 'Tap again to confirm' : 'Undo Today'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
