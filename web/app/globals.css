@@ -38,7 +38,7 @@ html, body {
 .app-shell {
   max-width: var(--max-w);
   margin: 0 auto;
-  min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--bg);
   position: relative;
   display: flex;
@@ -70,7 +70,7 @@ html, body {
 }
 
 .auth-page {
-  min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--bg);
   display: flex;
   flex-direction: column;
@@ -557,7 +557,7 @@ html, body {
 
 /* ===== FASTING TIMER FULL SCREEN ===== */
 .timer-screen {
-  min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--primary);
   display: flex;
   flex-direction: column;
@@ -571,7 +571,7 @@ html, body {
 
 /* ===== ONBOARDING ===== */
 .onboard-page {
-  min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--bg);
   display: flex;
   flex-direction: column;
@@ -614,7 +614,7 @@ html, body {
 }
 
 .loading-screen {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -760,7 +760,7 @@ html, body {
 
 /* ===== PAYWALL ===== */
 .paywall-screen {
-  min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--primary);
   display: flex;
   flex-direction: column;
