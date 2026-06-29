@@ -25,6 +25,7 @@ export interface Profile {
   custom_habits: Record<string, { goal: number; unit: string }> | null;
   stage_last_checked_at: string | null;
   learn_checkin_completed: Record<string, string> | null;
+  trends_prefs?: { visible?: string[] } | null;
   created_at: string;
   updated_at: string;
 }

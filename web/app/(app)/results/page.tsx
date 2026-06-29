@@ -254,6 +254,8 @@ interface TrendData {
   steps: ChartPoint[];
   mood: ChartPoint[];
   exercise: ChartPoint[];
+  glucose: ChartPoint[];
+  ketones: ChartPoint[];
 }
 
 function buildPoints(
@@ -288,7 +290,7 @@ function buildPoints(
       fastSessions.forEach(f => { const d = isoDate(new Date(f.started_at)); (m[d] ??= []).push(f.duration_minutes ?? 0); });
       return days.map(({ str, label }) => { const v = m[str] ?? []; return { label, value: v.length ? v.reduce((a,b)=>a+b,0)/v.length/60 : 0 }; });
     })();
-    return { fasting: fastMap, water: avgMap('water_ml'), sleep: avgMap('sleep_hours'), energy: avgMap('energy_level'), weight: avgMap('weight'), steps: avgMap('steps'), mood: avgMap('mood'), exercise: avgMap('exercise_minutes') };
+    return { fasting: fastMap, water: avgMap('water_ml'), sleep: avgMap('sleep_hours'), energy: avgMap('energy_level'), weight: avgMap('weight'), steps: avgMap('steps'), mood: avgMap('mood'), exercise: avgMap('exercise_minutes'), glucose: avgMap('blood_glucose'), ketones: avgMap('ketones_blood') };
   }
 
   if (period === 'month') {
@@ -305,7 +307,7 @@ function buildPoints(
       fastSessions.forEach(f => { const d = isoDate(new Date(f.started_at)); (m[d] ??= []).push(f.duration_minutes ?? 0); });
       return days.map(({ str, label }) => { const v = m[str] ?? []; return { label, value: v.length ? v.reduce((a,b)=>a+b,0)/v.length/60 : 0 }; });
     })();
-    return { fasting: fastMap, water: avgMap('water_ml'), sleep: avgMap('sleep_hours'), energy: avgMap('energy_level'), weight: avgMap('weight'), steps: avgMap('steps'), mood: avgMap('mood'), exercise: avgMap('exercise_minutes') };
+    return { fasting: fastMap, water: avgMap('water_ml'), sleep: avgMap('sleep_hours'), energy: avgMap('energy_level'), weight: avgMap('weight'), steps: avgMap('steps'), mood: avgMap('mood'), exercise: avgMap('exercise_minutes'), glucose: avgMap('blood_glucose'), ketones: avgMap('ketones_blood') };
   }
 
   // Year — 12 months
@@ -324,7 +326,7 @@ function buildPoints(
     fastSessions.forEach(f => { const k = monthKey(isoDate(new Date(f.started_at))); (m[k] ??= []).push(f.duration_minutes ?? 0); });
     return months.map(({ year, month, label }) => { const v = m[`${year}-${month}`] ?? []; return { label, value: v.length ? v.reduce((a,b)=>a+b,0)/v.length/60 : 0 }; });
   })();
-  return { fasting: fastMap, water: avgMap('water_ml'), sleep: avgMap('sleep_hours'), energy: avgMap('energy_level'), weight: avgMap('weight'), steps: avgMap('steps'), mood: avgMap('mood'), exercise: avgMap('exercise_minutes') };
+  return { fasting: fastMap, water: avgMap('water_ml'), sleep: avgMap('sleep_hours'), energy: avgMap('energy_level'), weight: avgMap('weight'), steps: avgMap('steps'), mood: avgMap('mood'), exercise: avgMap('exercise_minutes'), glucose: avgMap('blood_glucose'), ketones: avgMap('ketones_blood') };
 }
 
 function avgLabel(points: ChartPoint[], decimals = 1): string | null {
@@ -671,16 +673,27 @@ export default function MePage() {
     const sb = getSupabase();
     try {
       const yearAgo = new Date(); yearAgo.setFullYear(yearAgo.getFullYear() - 1);
-      const [{ data: entries }, { data: fasts }] = await Promise.all([
+      const [{ data: entries }, { data: fastSessions }, { data: biomarkers }] = await Promise.all([
         sb.from('health_entries').select('entry_date,metric,value')
           .eq('user_id', profile.id).gte('entry_date', isoDate(yearAgo)),
         sb.from('fasting_sessions').select('started_at,duration_minutes')
           .eq('user_id', profile.id).not('ended_at', 'is', null)
           .gte('started_at', yearAgo.toISOString()),
+        sb.from('biomarkers').select('reading_date,marker,value')
+          .eq('user_id', profile.id)
+          .gte('reading_date', isoDate(yearAgo)),
       ]);
+      // Normalize biomarkers into the same shape as health_entries so buildPoints handles them uniformly
+      const bioEntries = (biomarkers ?? []).map(
+        (b: { reading_date: string; marker: string; value: number }) => ({
+          entry_date: b.reading_date,
+          metric: b.marker,
+          value: b.value,
+        })
+      );
       setTrendData(buildPoints(trendPeriod,
-        (entries ?? []) as { entry_date: string; metric: string; value: number }[],
-        (fasts ?? []) as { started_at: string; duration_minutes: number | null }[],
+        [...(entries ?? []), ...bioEntries] as { entry_date: string; metric: string; value: number }[],
+        (fastSessions ?? []) as { started_at: string; duration_minutes: number | null }[],
       ));
     } catch {}
   }, [profile, trendPeriod]);
