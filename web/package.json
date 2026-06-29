@@ -1,6 +1,6 @@
 {
   "name": "fastwell-web",
-  "version": "2.8.60",
+  "version": "2.8.61",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3001",
@@ -16,7 +16,8 @@
     "next": "^15",
     "react": "^19",
     "react-dom": "^19",
-    "react-swipeable": "^7.0.2"
+    "react-swipeable": "^7.0.2",
+    "recharts": "^2.15.4"
   },
   "devDependencies": {
     "@types/node": "^20",

@@ -7,6 +7,11 @@ import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
 import type { FastingSession } from '@/lib/types';
 import { todayNZ, nzDayBoundsUTC } from '@/lib/dateNZ';
+import {
+  BarChart as RechartsBarChart, Bar,
+  LineChart as RechartsLineChart, Line,
+  XAxis, YAxis, ResponsiveContainer,
+} from 'recharts';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -165,55 +170,23 @@ function DaySummary({ dateStr, entries }: { dateStr: string; entries: DayEntry[]
 interface ChartPoint { label: string; value: number }
 
 function BarChart({ points, color = '#1E8A4F' }: { points: ChartPoint[]; color?: string }) {
-  if (!points.length) return null;
   const nonZero = points.filter(p => p.value > 0);
-  const max = Math.max(...points.map(p => p.value), 0.001);
-  const H = 80; const W = 100;
-  const gap = 1.5;
-  const barW = Math.max((W / points.length) - gap, 2);
-  const isYear = points.length === 12;
-  const isMonth = points.length === 30;
-  const labelH = isYear ? 20 : 14;
-
-  const showThisLabel = (i: number, label: string): boolean => {
-    if (isMonth) { const day = parseInt(label, 10); return day === 1 || day % 5 === 0; }
-    return true;
-  };
-  const labelY = (i: number): number => isYear ? H + (i % 2 === 0 ? 9 : 16) : H + labelH - 1;
-
-  if (!nonZero.length) {
+  if (!points.length || !nonZero.length) {
     return (
-      <svg viewBox={`0 0 ${W} ${H + labelH}`} style={{ width: '100%', height: H + labelH + 4 }} preserveAspectRatio="none">
-        <text x={W / 2} y={(H + labelH) / 2 + 4} textAnchor="middle" fontSize={7} fill="#6B7066" fontFamily="Lato,sans-serif">
-          Nothing logged yet
-        </text>
-      </svg>
+      <div style={{ height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>Nothing logged yet</p>
+      </div>
     );
   }
+  const interval = points.length === 30 ? 4 : 0;
   return (
-    <svg viewBox={`0 0 ${W} ${H + labelH}`} style={{ width: '100%', height: H + labelH + 4 }} preserveAspectRatio="none">
-      {points.map((p, i) => {
-        const h = Math.max((p.value / max) * H, p.value > 0 ? 2 : 0);
-        const x = i * (W / points.length) + gap / 2;
-        const r = Math.min(2.5, barW / 2);
-        return (
-          <g key={i}>
-            {h > 0 && (
-              <path
-                d={`M${x + r},${H - h} Q${x},${H - h} ${x},${H - h + r} L${x},${H} L${x + barW},${H} L${x + barW},${H - h + r} Q${x + barW},${H - h} ${x + barW - r},${H - h} Z`}
-                fill={color}
-                opacity={0.88}
-              />
-            )}
-            {showThisLabel(i, p.label) && (
-              <text x={x + barW / 2} y={labelY(i)} textAnchor="middle" fontSize={5} fill="#6B7066" fontFamily="Montserrat,sans-serif" fontWeight="600">
-                {p.label}
-              </text>
-            )}
-          </g>
-        );
-      })}
-    </svg>
+    <ResponsiveContainer width="100%" height={110}>
+      <RechartsBarChart data={points} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+        <XAxis dataKey="label" tick={{ fontSize: 10, fontFamily: 'Montserrat, sans-serif', fill: '#6B7066', fontWeight: 600 }} tickLine={false} axisLine={false} interval={interval} />
+        <YAxis hide width={0} domain={[0, 'auto']} />
+        <Bar dataKey="value" fill={color} radius={[3, 3, 0, 0]} />
+      </RechartsBarChart>
+    </ResponsiveContainer>
   );
 }
 
@@ -221,57 +194,30 @@ function LineChart({ points, color = '#1E8A4F' }: { points: ChartPoint[]; color?
   const nonZero = points.filter(p => p.value > 0);
   if (points.length < 2 || !nonZero.length) {
     return (
-      <svg viewBox="0 0 100 94" style={{ width: '100%', height: 98 }} preserveAspectRatio="none">
-        <text x={50} y={47} textAnchor="middle" fontSize={7} fill="#6B7066" fontFamily="Lato,sans-serif">
-          Nothing logged yet
-        </text>
-      </svg>
+      <div style={{ height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>Nothing logged yet</p>
+      </div>
     );
   }
-  const max = Math.max(...points.map(p => p.value), 0.001);
-  const min = Math.min(...nonZero.map(p => p.value));
-  const range = max - min || 1;
-  const H = 80; const W = 100;
-  const isYear = points.length === 12;
-  const isMonth = points.length === 30;
-  const labelH = isYear ? 20 : 14;
-  const toX = (i: number) => (i / (points.length - 1)) * W;
-  const toY = (v: number) => 4 + ((H - 8) - ((v - min) / range) * (H - 8));
-  const activePoints = points.filter(p => p.value > 0);
-  const poly = activePoints.map((p, i) => `${toX(points.indexOf(p))},${toY(p.value)}`).join(' ');
-  const firstX = toX(points.indexOf(activePoints[0]));
-  const lastX = toX(points.indexOf(activePoints[activePoints.length - 1]));
-  const fillPath = `M${firstX},${H} L${poly.replace(/^\d+\.?\d*,\d+\.?\d*/, `${firstX},${toY(activePoints[0].value)}`)} L${lastX},${H} Z`;
-  const hexToRgba = (hex: string, a: number) => {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r},${g},${b},${a})`;
-  };
-  const showThisLabel = (i: number, label: string): boolean => {
-    if (isMonth) { const day = parseInt(label, 10); return day === 1 || day % 5 === 0; }
-    return true;
-  };
-  const labelY = (i: number): number => isYear ? H + (i % 2 === 0 ? 9 : 16) : H + labelH - 1;
+  // Convert zero values to null so the line has gaps rather than dipping to zero
+  const chartData = points.map(p => ({ label: p.label, value: p.value > 0 ? p.value : null }));
+  const interval = points.length === 30 ? 4 : 0;
   return (
-    <svg viewBox={`0 0 ${W} ${H + labelH}`} style={{ width: '100%', height: H + labelH + 4 }} preserveAspectRatio="none">
-      <defs>
-        <linearGradient id={`grad-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.22" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
-      <path d={fillPath} fill={`url(#grad-${color.replace('#', '')})`} />
-      <polyline points={poly} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-      {activePoints.map((p, i) => (
-        <circle key={i} cx={toX(points.indexOf(p))} cy={toY(p.value)} r={2} fill={color} />
-      ))}
-      {points.map((p, i) => showThisLabel(i, p.label) && (
-        <text key={i} x={toX(i)} y={labelY(i)} textAnchor="middle" fontSize={5} fill="#6B7066" fontFamily="Montserrat,sans-serif" fontWeight="600">
-          {p.label}
-        </text>
-      ))}
-    </svg>
+    <ResponsiveContainer width="100%" height={110}>
+      <RechartsLineChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+        <XAxis dataKey="label" tick={{ fontSize: 10, fontFamily: 'Montserrat, sans-serif', fill: '#6B7066', fontWeight: 600 }} tickLine={false} axisLine={false} interval={interval} />
+        <YAxis hide width={0} domain={['auto', 'auto']} />
+        <Line
+          type="monotone"
+          dataKey="value"
+          stroke={color}
+          strokeWidth={2}
+          dot={{ r: 2, fill: color, strokeWidth: 0 }}
+          activeDot={{ r: 4 }}
+          connectNulls={false}
+        />
+      </RechartsLineChart>
+    </ResponsiveContainer>
   );
 }
 
