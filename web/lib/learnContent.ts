@@ -1,6 +1,54 @@
 // ⚠️ PLACEHOLDER CONTENT — Phase 1 structure only.
 // Phase 2 replaces all text in this file. No component changes needed for Phase 2.
 
+// ── Daily insight pool ────────────────────────────────────────────────────────
+// General pool — not stage-specific. Phase 2 will expand this to ~100+ real insights.
+// InsightCard derives the day's entry from UTC date; swipe offset is session state.
+
+export interface Insight {
+  id: string;
+  title: string; // short hook shown on the card
+  detail: string; // expanded text shown in the tap-to-read sheet
+}
+
+export const DAILY_INSIGHTS: Insight[] = [
+  {
+    id: 'ins-1',
+    title: '[PLACEHOLDER] Your body is doing something remarkable right now.',
+    detail: '[PLACEHOLDER] Longer detail for insight 1 goes here. Two short paragraphs explaining the concept in warm, encouraging language. Written for women 40–80 navigating hormonal change. Non-prescriptive, non-alarming.',
+  },
+  {
+    id: 'ins-2',
+    title: '[PLACEHOLDER] Sleep and hormones are more connected than you think.',
+    detail: '[PLACEHOLDER] Longer detail for insight 2. Explains the relationship between sleep quality and hormonal rhythms during perimenopause and beyond. Warm, actionable, not alarming.',
+  },
+  {
+    id: 'ins-3',
+    title: '[PLACEHOLDER] What you eat in the morning sets your energy for the day.',
+    detail: '[PLACEHOLDER] Longer detail for insight 3. Covers how morning nutrition choices — especially protein and fat — influence blood sugar and energy through hormonal shifts. Practical and encouraging.',
+  },
+  {
+    id: 'ins-4',
+    title: '[PLACEHOLDER] Stress is a hormone too — and it affects everything else.',
+    detail: '[PLACEHOLDER] Longer detail for insight 4. Explains cortisol\'s role in perimenopause and post-menopause, and why managing stress is genuinely physiological, not just mindset work. Compassionate tone.',
+  },
+  {
+    id: 'ins-5',
+    title: '[PLACEHOLDER] Fasting works differently at different times of your cycle.',
+    detail: '[PLACEHOLDER] Longer detail for insight 5. Introduces the idea of cycle-synced fasting — lighter fasting in the luteal phase, more flexibility in follicular. Grounded in Dr. Mindy Pelz\'s framework.',
+  },
+  {
+    id: 'ins-6',
+    title: '[PLACEHOLDER] Small consistent actions outperform big irregular ones.',
+    detail: '[PLACEHOLDER] Longer detail for insight 6. Encourages consistency over perfection. References research on habit formation and why women in midlife respond especially well to sustainable routines.',
+  },
+  {
+    id: 'ins-7',
+    title: '[PLACEHOLDER] Hydration matters more than you might expect during this stage.',
+    detail: '[PLACEHOLDER] Longer detail for insight 7. Covers how oestrogen affects fluid regulation and why hydration needs can shift during perimenopause. Practical tips without being prescriptive.',
+  },
+];
+
 export type LearnStageId = 'regular_cycle' | 'perimenopause' | 'transition' | 'post_menopause';
 
 export interface QuizQuestion {

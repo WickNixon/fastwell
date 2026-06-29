@@ -11,6 +11,7 @@ import {
   type LearnStageId,
 } from '@/lib/learnContent';
 import StageQuiz from './StageQuiz';
+import InsightCard from './InsightCard';
 
 // ── Re-check interval ────────────────────────────────────────────────────────
 // Change this single constant to adjust the re-check frequency.
@@ -258,25 +259,8 @@ export default function EducationPage() {
               )}
             </div>
 
-            {/* Bite-size insight cards */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {forYouContent.insightCards.map(card => (
-                <div
-                  key={card.id}
-                  className="card"
-                  style={{ borderLeft: '3px solid var(--primary)' }}
-                >
-                  <p style={{
-                    fontFamily: 'Lato, sans-serif',
-                    fontSize: 14,
-                    color: 'var(--text)',
-                    lineHeight: 1.55,
-                  }}>
-                    {card.text}
-                  </p>
-                </div>
-              ))}
-            </div>
+            {/* Daily insight card */}
+            <InsightCard />
           </>
         ) : (
           /* not_sure or null — gentle default */
