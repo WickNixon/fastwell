@@ -804,7 +804,7 @@ export default function MePage() {
   const daysInMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate();
 
   return (
-    <div className="page page-top" style={{ paddingTop: 8 }}>
+    <div className="page page-top">
       {/* Profile block — gear sits absolute top-right, aligned with the avatar circle top */}
       <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 24 }}>
         <button
