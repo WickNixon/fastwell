@@ -82,7 +82,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <main style={{ flex: 1, paddingBottom: 'var(--nav-height)' }}>
+      <main style={{ flex: 1, paddingBottom: 'calc(var(--nav-height) + env(safe-area-inset-bottom))' }}>
         {children}
       </main>
       <nav className="bottom-nav" role="navigation" aria-label="Main navigation">
