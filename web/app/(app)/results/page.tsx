@@ -804,7 +804,7 @@ export default function MePage() {
   const daysInMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate();
 
   return (
-    <div className="page page-top">
+    <div className="page page-top" style={{ paddingTop: 16 }}>
       {/* Header row */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
         <button
