@@ -7,12 +7,18 @@ import { AuthProvider } from '@/lib/auth-context';
 export const metadata: Metadata = {
   title: 'Fastwell',
   description: 'Your personalised health companion for the menopause journey.',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Fastwell',
+  },
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
