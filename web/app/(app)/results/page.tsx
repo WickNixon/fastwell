@@ -52,6 +52,60 @@ function habitColour(key: string, idx: number): string {
   return HABIT_COLOURS[key] ?? FALLBACK_COLOURS[idx % FALLBACK_COLOURS.length];
 }
 
+// ─── Trend definitions ────────────────────────────────────────────────────────
+
+interface TrendDef {
+  id: keyof TrendData;
+  label: string;
+  chartType: 'bar' | 'line';
+  defaultOn: boolean;
+  decimals: number;
+}
+
+// Single source of truth: all toggleable trends in display order
+const TREND_DEFS: TrendDef[] = [
+  { id: 'fasting',  label: 'Fasting duration', chartType: 'bar',  defaultOn: true,  decimals: 1 },
+  { id: 'weight',   label: 'Weight',            chartType: 'line', defaultOn: true,  decimals: 1 },
+  { id: 'sleep',    label: 'Sleep',             chartType: 'line', defaultOn: true,  decimals: 1 },
+  { id: 'energy',   label: 'Energy level',      chartType: 'line', defaultOn: true,  decimals: 1 },
+  { id: 'water',    label: 'Water intake',      chartType: 'bar',  defaultOn: false, decimals: 0 },
+  { id: 'steps',    label: 'Steps',             chartType: 'bar',  defaultOn: false, decimals: 0 },
+  { id: 'mood',     label: 'Mood',              chartType: 'line', defaultOn: false, decimals: 1 },
+  { id: 'exercise', label: 'Exercise',          chartType: 'bar',  defaultOn: false, decimals: 0 },
+  { id: 'glucose',  label: 'Blood glucose',     chartType: 'line', defaultOn: false, decimals: 1 },
+  { id: 'ketones',  label: 'Ketones',           chartType: 'line', defaultOn: false, decimals: 2 },
+];
+
+const TREND_COLOURS: Record<string, string> = {
+  fasting:  '#1E8A4F',
+  water:    '#4A90D9',
+  sleep:    '#6B9B4A',
+  energy:   '#4AD96B',
+  weight:   '#4A6BD9',
+  steps:    '#9B6B4A',
+  mood:     '#C44AD9',
+  exercise: '#E2682A',
+  glucose:  '#D9874A',
+  ketones:  '#4AD9C4',
+};
+
+const TREND_UNITS: Record<string, string> = {
+  fasting: 'h', water: 'ml', sleep: 'h', energy: '/5',
+  weight: 'kg', steps: 'steps', mood: '/5', exercise: 'min',
+  glucose: 'mmol/L', ketones: 'mmol/L',
+};
+
+const DEFAULT_VISIBLE = ['fasting', 'weight', 'sleep', 'energy'];
+const ALL_TREND_IDS = new Set(TREND_DEFS.map(d => d.id as string));
+
+// Safe fallback: null/undefined/empty/invalid prefs → default set (never zero charts)
+function getVisibleTrends(trendsPrefs: { visible?: string[] } | null | undefined): string[] {
+  const raw = trendsPrefs?.visible;
+  if (!Array.isArray(raw) || raw.length === 0) return DEFAULT_VISIBLE;
+  const valid = raw.filter(id => ALL_TREND_IDS.has(id));
+  return valid.length > 0 ? valid : DEFAULT_VISIBLE;
+}
+
 // ─── Calendar Component ───────────────────────────────────────────────────────
 
 interface DayEntry { metric: string; value?: number | null }
@@ -594,7 +648,7 @@ function FoodLogSection({ userId }: { userId: string }) {
 // ─── Main Me Page ─────────────────────────────────────────────────────────────
 
 export default function MePage() {
-  const { profile, loading: authLoading } = useAuth();
+  const { profile, loading: authLoading, refreshProfile } = useAuth();
   const router = useRouter();
 
   // All-time stats
@@ -611,6 +665,15 @@ export default function MePage() {
   // Trend charts
   const [trendPeriod, setTrendPeriod] = useState<'week' | 'month' | 'year'>('week');
   const [trendData, setTrendData] = useState<TrendData | null>(null);
+
+  // Customise trends sheet
+  const [showCustomise, setShowCustomise] = useState(false);
+  const [customiseDraft, setCustomiseDraft] = useState<string[]>([]);
+  const [customiseSaving, setCustomiseSaving] = useState(false);
+  const [customiseError, setCustomiseError] = useState<string | null>(null);
+
+  // Derive visible trends from profile — safe fallback ensures never zero charts
+  const visibleTrends = getVisibleTrends(profile?.trends_prefs);
 
   // Period results
   const [period, setPeriod] = useState<'7d' | '30d' | '3m' | '6m' | '12m'>('30d');
@@ -736,6 +799,36 @@ export default function MePage() {
 
   useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
 
+  const openCustomise = () => {
+    setCustomiseDraft([...visibleTrends]);
+    setCustomiseError(null);
+    setShowCustomise(true);
+  };
+
+  const toggleTrend = (id: string) => {
+    setCustomiseDraft(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const saveCustomise = async () => {
+    if (customiseDraft.length === 0) return; // safety: never save empty selection
+    if (!profile) return;
+    setCustomiseSaving(true);
+    setCustomiseError(null);
+    const sb = getSupabase();
+    const { error } = await sb.from('profiles')
+      .update({ trends_prefs: { visible: customiseDraft } })
+      .eq('id', profile.id);
+    if (error) {
+      console.error('Failed to save trend preferences:', error);
+      setCustomiseError('Failed to save — please try again.');
+      setCustomiseSaving(false);
+      return;
+    }
+    await refreshProfile();
+    setShowCustomise(false);
+    setCustomiseSaving(false);
+  };
+
   const initials = profile?.first_name ? profile.first_name.charAt(0).toUpperCase() : '?';
   const tierLabel = profile?.subscription_tier === 'member_pro' ? 'Member' : 'Pro';
   const tierColor = profile?.subscription_tier === 'member_pro' ? '#1E8A4F' : '#E2682A';
@@ -834,7 +927,20 @@ export default function MePage() {
 
       {/* Trend charts */}
       <div className="section">
-        <p className="section-label mb-12">Trends</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <p className="section-label" style={{ margin: 0 }}>Trends</p>
+          <button
+            onClick={openCustomise}
+            style={{
+              background: 'none', border: '1.5px solid var(--border)', borderRadius: 20,
+              cursor: 'pointer', padding: '4px 12px',
+              fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 12,
+              color: 'var(--text-muted)',
+            }}
+          >
+            Edit
+          </button>
+        </div>
         <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
           {(['week', 'month', 'year'] as const).map(p => (
             <button key={p} onClick={() => setTrendPeriod(p)} style={{
@@ -848,18 +954,20 @@ export default function MePage() {
             </button>
           ))}
         </div>
-        {trendData && (
-          <>
-            <ChartCard title="Fasting duration" average={avgLabel(trendData.fasting)} unit="h" points={trendData.fasting} type="bar" color="#1E8A4F" />
-            <ChartCard title="Water intake" average={avgLabel(trendData.water, 0)} unit="ml" points={trendData.water} type="bar" color="#4A90D9" />
-            <ChartCard title="Sleep" average={avgLabel(trendData.sleep)} unit="h" points={trendData.sleep} type="line" color="#6B9B4A" />
-            <ChartCard title="Energy level" average={avgLabel(trendData.energy)} unit="/5" points={trendData.energy} type="line" color="#D9C44A" />
-            <ChartCard title="Weight" average={avgLabel(trendData.weight)} unit={profile?.weight_unit ?? 'kg'} points={trendData.weight} type="line" color="#E2682A" />
-            <ChartCard title="Steps" average={avgLabel(trendData.steps, 0)} unit="steps" points={trendData.steps} type="bar" color="#9B6B4A" />
-            <ChartCard title="Mood" average={avgLabel(trendData.mood)} unit="/5" points={trendData.mood} type="line" color="#C44AD9" />
-            <ChartCard title="Exercise" average={avgLabel(trendData.exercise, 0)} unit="min" points={trendData.exercise} type="bar" color="#E2682A" />
-          </>
-        )}
+        {trendData && TREND_DEFS
+          .filter(def => visibleTrends.includes(def.id))
+          .map(def => (
+            <ChartCard
+              key={def.id}
+              title={def.label}
+              average={avgLabel(trendData[def.id], def.decimals)}
+              unit={def.id === 'weight' ? (profile?.weight_unit ?? 'kg') : TREND_UNITS[def.id]}
+              points={trendData[def.id]}
+              type={def.chartType}
+              color={TREND_COLOURS[def.id]}
+            />
+          ))
+        }
       </div>
 
       {/* Period filter + results */}
@@ -942,6 +1050,62 @@ export default function MePage() {
             />
             {selectedDay && <DaySummary dateStr={selectedDay} entries={dayData[selectedDay] ?? []} />}
             <button className="btn btn-ghost mt-16" onClick={() => setShowAllCalendar(false)}>Close</button>
+          </div>
+        </div>
+      )}
+
+      {/* Customise trends sheet */}
+      {showCustomise && (
+        <div className="modal-overlay" onClick={() => setShowCustomise(false)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 17, marginBottom: 4, color: 'var(--text)' }}>
+              Customise trends
+            </p>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif', marginBottom: 20 }}>
+              Choose which trends to show.
+            </p>
+            {TREND_DEFS.map(def => (
+              <div
+                key={def.id}
+                onClick={() => toggleTrend(def.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '14px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer',
+                }}
+              >
+                <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 15, color: 'var(--text)' }}>{def.label}</p>
+                <div style={{
+                  width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                  border: `2px solid ${customiseDraft.includes(def.id) ? TREND_COLOURS[def.id] : 'var(--border)'}`,
+                  backgroundColor: customiseDraft.includes(def.id) ? TREND_COLOURS[def.id] : 'transparent',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {customiseDraft.includes(def.id) && (
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </div>
+              </div>
+            ))}
+            {customiseDraft.length === 0 && (
+              <p style={{ fontSize: 12, color: 'var(--accent)', fontFamily: 'Lato, sans-serif', marginTop: 10 }}>
+                Select at least one trend to show.
+              </p>
+            )}
+            {customiseError && (
+              <p style={{ fontSize: 13, color: '#C62828', fontFamily: 'Lato, sans-serif', marginTop: 10 }}>{customiseError}</p>
+            )}
+            <button
+              className="btn btn-primary"
+              onClick={saveCustomise}
+              disabled={customiseSaving || customiseDraft.length === 0}
+              style={{ marginTop: 20, marginBottom: 8 }}
+            >
+              {customiseSaving ? 'Saving…' : 'Save'}
+            </button>
+            <button className="btn btn-ghost" onClick={() => setShowCustomise(false)}>Cancel</button>
           </div>
         </div>
       )}
