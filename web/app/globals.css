@@ -30,7 +30,7 @@ input, textarea, select { font: inherit; }
 /* ===== BASE ===== */
 html, body {
   height: 100%;
-  background-color: var(--primary);
+  background-color: var(--bg);
   color: var(--text);
 }
 
@@ -43,6 +43,7 @@ html, body {
   position: relative;
   display: flex;
   flex-direction: column;
+  padding-top: env(safe-area-inset-top);
 }
 
 @media (min-width: 500px) {
