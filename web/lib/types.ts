@@ -26,6 +26,7 @@ export interface Profile {
   stage_last_checked_at: string | null;
   learn_checkin_completed: Record<string, string> | null;
   trends_prefs?: { visible?: string[] } | null;
+  notification_prefs?: Record<string, boolean> | null;
   created_at: string;
   updated_at: string;
 }
