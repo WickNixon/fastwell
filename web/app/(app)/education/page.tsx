@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
@@ -57,6 +57,28 @@ export default function EducationPage() {
   const [quizStage, setQuizStage] = useState<LearnStageId | null>(null);
   const [activeExplore, setActiveExplore] = useState<LearnStageId | null>(null);
   const [recheckOpen, setRecheckOpen] = useState(false);
+  const [quizCompleted, setQuizCompleted] = useState(false);
+
+  // Restore completed state from localStorage on mount (survives refresh, no DB column needed).
+  // Keyed by stage so a stage change clears it automatically.
+  useEffect(() => {
+    if (!forYouId) return;
+    try {
+      const raw = localStorage.getItem('fw_quiz_done');
+      if (raw) {
+        const { stageId } = JSON.parse(raw) as { stageId: string };
+        if (stageId === forYouId) setQuizCompleted(true);
+      }
+    } catch {}
+  }, [forYouId]);
+
+  const handleQuizComplete = () => {
+    try {
+      localStorage.setItem('fw_quiz_done', JSON.stringify({ stageId: forYouId, ts: Date.now() }));
+    } catch {}
+    setQuizCompleted(true);
+    setQuizStage(null);
+  };
 
   // Quiz screen
   if (quizStage) {
@@ -68,6 +90,7 @@ export default function EducationPage() {
         stageColour={content.definition.colour}
         questions={content.quiz}
         onClose={() => setQuizStage(null)}
+        onComplete={handleQuizComplete}
       />
     );
   }
@@ -182,12 +205,34 @@ export default function EducationPage() {
               }}>
                 {forYouContent.definition.subtitle}
               </p>
-              <button
-                className="btn btn-primary"
-                onClick={() => setQuizStage(forYouId)}
-              >
-                Start your check-in →
-              </button>
+              {quizCompleted ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 0 10px' }}>
+                    <span style={{ color: 'var(--primary)', fontSize: 18, lineHeight: 1 }}>✓</span>
+                    <p style={{
+                      fontFamily: 'Montserrat, sans-serif',
+                      fontWeight: 600,
+                      fontSize: 14,
+                      color: 'var(--primary)',
+                    }}>
+                      Check-in complete
+                    </p>
+                  </div>
+                  <button
+                    className="btn btn-outline"
+                    onClick={() => setQuizStage(forYouId)}
+                  >
+                    Take it again
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setQuizStage(forYouId)}
+                >
+                  Start your check-in →
+                </button>
+              )}
             </div>
 
             {/* Bite-size insight cards */}

@@ -12,6 +12,7 @@ interface StageQuizProps {
   stageColour: string;
   questions: QuizQuestion[];
   onClose: () => void;
+  onComplete?: () => void;
 }
 
 type Phase = 'question' | 'insight' | 'done';
@@ -22,6 +23,7 @@ export default function StageQuiz({
   stageColour,
   questions,
   onClose,
+  onComplete,
 }: StageQuizProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [phase, setPhase] = useState<Phase>('question');
@@ -138,7 +140,7 @@ export default function StageQuiz({
         }}
       >
         {phase === 'done' ? (
-          <CompletionState stageLabel={stageLabel} onClose={onClose} />
+          <CompletionState stageLabel={stageLabel} onClose={onComplete ?? onClose} />
         ) : phase === 'insight' && selectedOption !== null ? (
           <InsightReveal
             question={question}
