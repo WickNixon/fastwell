@@ -17,16 +17,21 @@ import {
 
 function isoDate(d: Date) { return d.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' }); }
 
-function calcLongestStreak(dates: string[]): number {
+function calcCurrentStreak(dates: string[]): number {
   if (!dates.length) return 0;
-  const sorted = [...new Set(dates)].sort();
-  let longest = 1; let current = 1;
-  for (let i = 1; i < sorted.length; i++) {
-    const diff = (new Date(sorted[i]).getTime() - new Date(sorted[i - 1]).getTime()) / 86400000;
-    if (diff === 1) { current++; longest = Math.max(longest, current); }
-    else { current = 1; }
+  const unique = new Set(dates);
+  // If today isn't logged yet, count from yesterday so streak reads correctly all morning
+  const todayStr = todayNZ();
+  const ref = new Date();
+  if (!unique.has(todayStr)) ref.setDate(ref.getDate() - 1);
+  let streak = 0;
+  for (let i = 0; i < 1000; i++) {
+    const d = new Date(ref);
+    d.setDate(ref.getDate() - i);
+    if (!unique.has(isoDate(d))) break;
+    streak++;
   }
-  return longest;
+  return streak;
 }
 
 // ─── Habit colour palette ─────────────────────────────────────────────────────
@@ -699,7 +704,7 @@ export default function MePage() {
       ]);
       setTotalFasts(fastsCount ?? 0);
       setBadgeCount(badges ?? 0);
-      setStreak(calcLongestStreak((entryDates ?? []).map((e: { entry_date: string }) => e.entry_date)));
+      setStreak(calcCurrentStreak((entryDates ?? []).map((e: { entry_date: string }) => e.entry_date)));
     } catch {}
   }, [profile]);
 
