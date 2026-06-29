@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
@@ -57,27 +57,31 @@ export default function EducationPage() {
   const [quizStage, setQuizStage] = useState<LearnStageId | null>(null);
   const [activeExplore, setActiveExplore] = useState<LearnStageId | null>(null);
   const [recheckOpen, setRecheckOpen] = useState(false);
-  const [quizCompleted, setQuizCompleted] = useState(false);
+  const [checkinSaveError, setCheckinSaveError] = useState('');
 
-  // Restore completed state from localStorage on mount (survives refresh, no DB column needed).
-  // Keyed by stage so a stage change clears it automatically.
-  useEffect(() => {
-    if (!forYouId) return;
-    try {
-      const raw = localStorage.getItem('fw_quiz_done');
-      if (raw) {
-        const { stageId } = JSON.parse(raw) as { stageId: string };
-        if (stageId === forYouId) setQuizCompleted(true);
-      }
-    } catch {}
-  }, [forYouId]);
+  // Derived from profile — no local state needed. Stage change naturally invalidates
+  // because forYouId changes and the new stage won't have a key in the JSONB yet.
+  const quizCompleted = !!(forYouId && profile?.learn_checkin_completed?.[forYouId]);
 
   const handleQuizComplete = () => {
-    try {
-      localStorage.setItem('fw_quiz_done', JSON.stringify({ stageId: forYouId, ts: Date.now() }));
-    } catch {}
-    setQuizCompleted(true);
-    setQuizStage(null);
+    setQuizStage(null); // close quiz optimistically
+    if (!forYouId || !profile) return;
+    setCheckinSaveError('');
+
+    const updated = { ...(profile.learn_checkin_completed ?? {}), [forYouId]: new Date().toISOString() };
+
+    getSupabase()
+      .from('profiles')
+      .update({ learn_checkin_completed: updated })
+      .eq('id', profile.id)
+      .then(({ error }) => {
+        if (error) {
+          console.error('learn check-in save error:', error);
+          setCheckinSaveError('Your check-in couldn\'t be saved. Please refresh and try again.');
+        } else {
+          refreshProfile();
+        }
+      });
   };
 
   // Quiz screen
@@ -126,6 +130,25 @@ export default function EducationPage() {
         <h1 className="h1" style={{ marginBottom: 4 }}>Learn</h1>
         <p className="body-sm">Your stage, your way — one idea at a time.</p>
       </div>
+
+      {/* ── CHECK-IN SAVE ERROR (shown if Supabase write failed) ─────────── */}
+      {checkinSaveError && (
+        <div
+          style={{
+            backgroundColor: '#FBE4D6',
+            border: '1px solid var(--accent)',
+            borderRadius: 12,
+            padding: '12px 16px',
+            marginBottom: 16,
+            fontFamily: 'Lato, sans-serif',
+            fontSize: 14,
+            color: 'var(--text)',
+            lineHeight: 1.5,
+          }}
+        >
+          {checkinSaveError}
+        </div>
+      )}
 
       {/* ── RE-CHECK CARD (shown when due) ───────────────────────────────── */}
       {recheckDue && (
