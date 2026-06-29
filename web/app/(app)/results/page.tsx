@@ -252,6 +252,8 @@ interface TrendData {
   energy: ChartPoint[];
   weight: ChartPoint[];
   steps: ChartPoint[];
+  mood: ChartPoint[];
+  exercise: ChartPoint[];
 }
 
 function buildPoints(
@@ -286,7 +288,7 @@ function buildPoints(
       fastSessions.forEach(f => { const d = isoDate(new Date(f.started_at)); (m[d] ??= []).push(f.duration_minutes ?? 0); });
       return days.map(({ str, label }) => { const v = m[str] ?? []; return { label, value: v.length ? v.reduce((a,b)=>a+b,0)/v.length/60 : 0 }; });
     })();
-    return { fasting: fastMap, water: avgMap('water_ml'), sleep: avgMap('sleep_hours'), energy: avgMap('energy_level'), weight: avgMap('weight'), steps: avgMap('steps') };
+    return { fasting: fastMap, water: avgMap('water_ml'), sleep: avgMap('sleep_hours'), energy: avgMap('energy_level'), weight: avgMap('weight'), steps: avgMap('steps'), mood: avgMap('mood'), exercise: avgMap('exercise_minutes') };
   }
 
   if (period === 'month') {
@@ -303,7 +305,7 @@ function buildPoints(
       fastSessions.forEach(f => { const d = isoDate(new Date(f.started_at)); (m[d] ??= []).push(f.duration_minutes ?? 0); });
       return days.map(({ str, label }) => { const v = m[str] ?? []; return { label, value: v.length ? v.reduce((a,b)=>a+b,0)/v.length/60 : 0 }; });
     })();
-    return { fasting: fastMap, water: avgMap('water_ml'), sleep: avgMap('sleep_hours'), energy: avgMap('energy_level'), weight: avgMap('weight'), steps: avgMap('steps') };
+    return { fasting: fastMap, water: avgMap('water_ml'), sleep: avgMap('sleep_hours'), energy: avgMap('energy_level'), weight: avgMap('weight'), steps: avgMap('steps'), mood: avgMap('mood'), exercise: avgMap('exercise_minutes') };
   }
 
   // Year — 12 months
@@ -322,7 +324,7 @@ function buildPoints(
     fastSessions.forEach(f => { const k = monthKey(isoDate(new Date(f.started_at))); (m[k] ??= []).push(f.duration_minutes ?? 0); });
     return months.map(({ year, month, label }) => { const v = m[`${year}-${month}`] ?? []; return { label, value: v.length ? v.reduce((a,b)=>a+b,0)/v.length/60 : 0 }; });
   })();
-  return { fasting: fastMap, water: avgMap('water_ml'), sleep: avgMap('sleep_hours'), energy: avgMap('energy_level'), weight: avgMap('weight'), steps: avgMap('steps') };
+  return { fasting: fastMap, water: avgMap('water_ml'), sleep: avgMap('sleep_hours'), energy: avgMap('energy_level'), weight: avgMap('weight'), steps: avgMap('steps'), mood: avgMap('mood'), exercise: avgMap('exercise_minutes') };
 }
 
 function avgLabel(points: ChartPoint[], decimals = 1): string | null {
@@ -841,6 +843,8 @@ export default function MePage() {
             <ChartCard title="Energy level" average={avgLabel(trendData.energy)} unit="/5" points={trendData.energy} type="line" color="#D9C44A" />
             <ChartCard title="Weight" average={avgLabel(trendData.weight)} unit={profile?.weight_unit ?? 'kg'} points={trendData.weight} type="line" color="#E2682A" />
             <ChartCard title="Steps" average={avgLabel(trendData.steps, 0)} unit="steps" points={trendData.steps} type="bar" color="#9B6B4A" />
+            <ChartCard title="Mood" average={avgLabel(trendData.mood)} unit="/5" points={trendData.mood} type="line" color="#C44AD9" />
+            <ChartCard title="Exercise" average={avgLabel(trendData.exercise, 0)} unit="min" points={trendData.exercise} type="bar" color="#E2682A" />
           </>
         )}
       </div>
