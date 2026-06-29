@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
+import { BackChip } from '../_components';
 
 const NON_MEMBER_PLANS = [
   { key: 'weekly',  label: 'Weekly',  badge: 'Popular',    duration: '1 Week',  perDay: '$0.61 / day', price: '$4.30', priceSub: 'per week',           save: null },
@@ -25,7 +25,6 @@ const FEATURES = [
 
 export default function SettingsSubscriptionPage() {
   const { profile } = useAuth();
-  const router = useRouter();
   const [selectedPlan, setSelectedPlan] = useState<'weekly' | 'monthly' | 'annual'>('monthly');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -80,8 +79,8 @@ export default function SettingsSubscriptionPage() {
   if (isPro && profile?.stripe_subscription_id) {
     return (
       <div className="page page-top">
-        <button onClick={() => router.back()} style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Lato, sans-serif' }}>← Back</button>
-        <h1 className="h1 mb-8">Subscription</h1>
+        <BackChip />
+        <h1 className="h1 mb-8" style={{ marginTop: 16 }}>Subscription</h1>
         <p className="body-sm mb-32" style={{ color: 'var(--text-muted)' }}>
           {isMember ? 'Wicked Wellbeing member — 50% off Pro, forever.' : 'Pro plan active.'}
         </p>
@@ -95,13 +94,9 @@ export default function SettingsSubscriptionPage() {
   // Plan selection screen (free or trial expired)
   return (
     <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
-      {/* Close / Back */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 20px 0' }}>
-        <button
-          onClick={() => router.back()}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 24, color: 'var(--text-muted)', lineHeight: 1, padding: 4 }}
-          aria-label="Close"
-        >✕</button>
+      {/* Back */}
+      <div style={{ padding: '16px 20px 0' }}>
+        <BackChip />
       </div>
 
       <div style={{ flex: 1, padding: '8px 20px 32px', overflowY: 'auto' }}>

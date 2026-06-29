@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { BackChip } from '../_components';
 import { createClient } from '@/lib/supabase';
 import AgeTumbler from '@/components/AgeTumbler';
 
@@ -37,7 +37,6 @@ const GOAL_OPTIONS = [
 export default function SettingsProfilePage() {
   const { profile, refreshProfile } = useAuth();
   const supabase = createClient();
-  const router = useRouter();
 
   const [firstName, setFirstName] = useState('');
   const [age, setAge] = useState(52);
@@ -90,8 +89,8 @@ export default function SettingsProfilePage() {
 
   return (
     <div className="page page-top">
-      <button onClick={() => router.back()} style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Lato, sans-serif' }}>← Back</button>
-      <h1 className="h1 mb-8">Profile</h1>
+      <BackChip />
+      <h1 className="h1 mb-8" style={{ marginTop: 16 }}>Profile</h1>
       <p className="body-sm mb-24">Your details from setup — tap any field to update.</p>
 
       {saved && (

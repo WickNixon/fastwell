@@ -1,11 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase-browser';
+import { BackChip } from '../_components';
 
 export default function ChangePasswordPage() {
-  const router = useRouter();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -31,8 +30,8 @@ export default function ChangePasswordPage() {
 
   return (
     <div className="page page-top">
-      <button onClick={() => router.back()} style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Lato, sans-serif' }}>← Back</button>
-      <h1 className="h1 mb-24">Change password</h1>
+      <BackChip />
+      <h1 className="h1 mb-24" style={{ marginTop: 16 }}>Change password</h1>
 
       {saved && (
         <div style={{ background: 'var(--primary-pale)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, color: 'var(--primary)', fontFamily: 'Lato, sans-serif', fontSize: 14 }}>

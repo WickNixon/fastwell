@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { BackChip } from '../_components';
 
 const INTEGRATIONS = [
   { icon: '🍎', name: 'Apple Health', sub: 'Steps, sleep, weight, heart rate', available: false },
@@ -9,12 +9,10 @@ const INTEGRATIONS = [
 ];
 
 export default function SettingsIntegrationsPage() {
-  const router = useRouter();
-
   return (
     <div className="page page-top">
-      <button onClick={() => router.back()} style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Lato, sans-serif' }}>← Back</button>
-      <h1 className="h1 mb-8">Integrations</h1>
+      <BackChip />
+      <h1 className="h1 mb-8" style={{ marginTop: 16 }}>Integrations</h1>
       <p className="body-sm mb-24">These will just make it easier — Fastwell reads your existing data so you're not logging twice.</p>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
