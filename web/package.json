@@ -1,6 +1,6 @@
 {
   "name": "fastwell-web",
-  "version": "2.8.76",
+  "version": "2.8.77",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3001",
@@ -13,6 +13,7 @@
     "@anthropic-ai/sdk": "^0.89.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.2",
+    "jspdf": "^4.2.1",
     "next": "^15",
     "react": "^19",
     "react-dom": "^19",
