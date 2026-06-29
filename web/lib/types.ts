@@ -23,6 +23,7 @@ export interface Profile {
   weight_unit: string;
   onboarding_complete: boolean;
   custom_habits: Record<string, { goal: number; unit: string }> | null;
+  stage_last_checked_at: string | null;
   created_at: string;
   updated_at: string;
 }
