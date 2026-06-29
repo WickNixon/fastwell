@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { createClient } from '@/lib/supabase';
 import { getSupabase } from '@/lib/supabase-browser';
-import type { FastingSession } from '@/lib/types';
 import { todayNZ, nzDayBoundsUTC } from '@/lib/dateNZ';
 import {
   BarChart as RechartsBarChart, Bar,
@@ -680,16 +679,6 @@ export default function MePage() {
   // Derive visible trends from profile — safe fallback ensures never zero charts
   const visibleTrends = getVisibleTrends(profile?.trends_prefs);
 
-  // Period results
-  const [period, setPeriod] = useState<'7d' | '30d' | '3m' | '6m' | '12m'>('30d');
-  const [fasts, setFasts] = useState<FastingSession[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [avgSleep, setAvgSleep] = useState<string | null>(null);
-  const [avgEnergy, setAvgEnergy] = useState<string | null>(null);
-  const [avgWater, setAvgWater] = useState<string | null>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const DAYS: Record<string, number> = { '7d': 7, '30d': 30, '3m': 90, '6m': 180, '12m': 365 };
 
   const loadStats = useCallback(async () => {
     if (!profile) return;
@@ -766,43 +755,12 @@ export default function MePage() {
     } catch {}
   }, [profile, trendPeriod]);
 
-  const loadPeriod = useCallback(async () => {
-    if (!profile) return;
-    setLoading(true);
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => setLoading(false), 5000);
-    try {
-      const since = new Date(Date.now() - DAYS[period] * 86400000).toISOString();
-      const sb = getSupabase();
-      const [{ data: f }, { data: entries }] = await Promise.all([
-        sb.from('fasting_sessions').select('*').eq('user_id', profile.id)
-          .gte('started_at', since).not('ended_at', 'is', null),
-        sb.from('health_entries').select('metric,value').eq('user_id', profile.id)
-          .gte('entry_date', since.split('T')[0]),
-      ]);
-      setFasts(f ?? []);
-      const avg = (metric: string) => {
-        const vals = (entries ?? []).filter(e => e.metric === metric).map(e => e.value).filter(v => v != null) as number[];
-        return vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1) : null;
-      };
-      setAvgSleep(avg('sleep_hours'));
-      setAvgEnergy(avg('energy_level'));
-      setAvgWater(avg('water_ml'));
-    } catch {} finally {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      setLoading(false);
-    }
-  }, [profile, period]);
-
   useEffect(() => {
     if (authLoading) return;
     loadStats();
     loadCalendar();
-    loadPeriod();
     loadTrends();
-  }, [authLoading, loadStats, loadCalendar, loadPeriod, loadTrends]);
-
-  useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
+  }, [authLoading, loadStats, loadCalendar, loadTrends]);
 
   const openCustomise = () => {
     setCustomiseDraft([...visibleTrends]);
@@ -837,10 +795,6 @@ export default function MePage() {
   const initials = profile?.first_name ? profile.first_name.charAt(0).toUpperCase() : '?';
   const tierLabel = profile?.subscription_tier === 'member_pro' ? 'Member' : 'Pro';
   const tierColor = profile?.subscription_tier === 'member_pro' ? '#1E8A4F' : '#E2682A';
-  const fastCount = fasts.length;
-  const avgFastHours = fastCount
-    ? Math.floor(fasts.reduce((s, f) => s + (f.duration_minutes ?? 0), 0) / fastCount / 60)
-    : null;
 
   // 14-day calendar window
   const twoWeeksAgo = new Date(); twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 13);
@@ -974,59 +928,6 @@ export default function MePage() {
           ))
         }
       </div>
-
-      {/* Period filter + results */}
-      <div className="filter-tabs mb-20">
-        {(['7d', '30d', '3m', '6m', '12m'] as const).map(p => (
-          <button key={p} className={`filter-tab ${period === p ? 'active' : ''}`} onClick={() => setPeriod(p)}>{p}</button>
-        ))}
-      </div>
-
-      {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}><div className="spinner" /></div>
-      ) : (
-        <>
-          <div className="section">
-            <p className="section-label mb-12">Fasting</p>
-            <div className="stat-row">
-              <div className="stat-card">
-                <p className="stat-value">{fastCount}</p>
-                <p className="stat-unit">fasts</p>
-              </div>
-              <div className="stat-card">
-                <p className="stat-value">{avgFastHours != null ? `${avgFastHours}h` : '—'}</p>
-                <p className="stat-unit">avg duration</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="section">
-            <p className="section-label mb-12">Wellbeing</p>
-            <div className="stat-row">
-              <div className="stat-card">
-                <p className="stat-value">{avgSleep ?? '—'}</p>
-                <p className="stat-unit">avg sleep</p>
-              </div>
-              <div className="stat-card">
-                <p className="stat-value">{avgEnergy ?? '—'}</p>
-                <p className="stat-unit">avg energy</p>
-              </div>
-              <div className="stat-card">
-                <p className="stat-value">{avgWater ? `${Math.round(parseFloat(avgWater) / 100) * 100}` : '—'}</p>
-                <p className="stat-unit">avg water</p>
-              </div>
-            </div>
-          </div>
-
-          {fastCount === 0 && !avgSleep && !avgEnergy && (
-            <div className="empty-state mt-20">
-              <div className="empty-state-icon">🌱</div>
-              <p className="h3">Nothing here yet</p>
-              <p className="body-sm">As you start logging, your progress will show up here.</p>
-            </div>
-          )}
-        </>
-      )}
 
       {/* See All calendar modal */}
       {showAllCalendar && (
