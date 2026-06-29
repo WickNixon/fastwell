@@ -8,6 +8,7 @@ import {
   STAGE_CONTENT,
   type LearnStageId,
 } from '@/lib/learnContent';
+import StageQuiz from './StageQuiz';
 
 export default function EducationPage() {
   const { profile } = useAuth();
@@ -21,8 +22,22 @@ export default function EducationPage() {
     .filter(id => id !== forYouId)
     .map(id => STAGE_CONTENT[id].definition);
 
-  const [showQuizPlaceholder, setShowQuizPlaceholder] = useState(false);
+  const [quizStage, setQuizStage] = useState<LearnStageId | null>(null);
   const [activeExplore, setActiveExplore] = useState<LearnStageId | null>(null);
+
+  // Quiz screen — renders above everything else
+  if (quizStage) {
+    const content = STAGE_CONTENT[quizStage];
+    return (
+      <StageQuiz
+        stageLabel={content.definition.label}
+        stageEmoji={content.definition.emoji}
+        stageColour={content.definition.colour}
+        questions={content.quiz}
+        onClose={() => setQuizStage(null)}
+      />
+    );
+  }
 
   if (activeExplore) {
     return (
@@ -77,37 +92,12 @@ export default function EducationPage() {
                 {forYouContent.definition.subtitle}
               </p>
 
-              {showQuizPlaceholder ? (
-                <div style={{
-                  backgroundColor: 'rgba(255,255,255,0.65)',
-                  borderRadius: 12,
-                  padding: '16px',
-                  textAlign: 'center',
-                }}>
-                  <p style={{
-                    fontFamily: 'Lato, sans-serif',
-                    fontSize: 14,
-                    color: 'var(--text)',
-                    marginBottom: 12,
-                  }}>
-                    [PLACEHOLDER — Quiz mechanic builds in Change 2]
-                  </p>
-                  <button
-                    className="btn btn-outline btn-sm"
-                    style={{ width: 'auto', margin: '0 auto' }}
-                    onClick={() => setShowQuizPlaceholder(false)}
-                  >
-                    Close
-                  </button>
-                </div>
-              ) : (
-                <button
-                  className="btn btn-primary"
-                  onClick={() => setShowQuizPlaceholder(true)}
-                >
-                  Start your check-in →
-                </button>
-              )}
+              <button
+                className="btn btn-primary"
+                onClick={() => setQuizStage(forYouId)}
+              >
+                Start your check-in →
+              </button>
             </div>
 
             {/* Bite-size insight cards */}
@@ -159,37 +149,12 @@ export default function EducationPage() {
               we&apos;ll make this section yours.
             </p>
 
-            {showQuizPlaceholder ? (
-              <div style={{
-                backgroundColor: 'rgba(255,255,255,0.65)',
-                borderRadius: 12,
-                padding: '16px',
-                textAlign: 'center',
-              }}>
-                <p style={{
-                  fontFamily: 'Lato, sans-serif',
-                  fontSize: 14,
-                  color: 'var(--text)',
-                  marginBottom: 12,
-                }}>
-                  [PLACEHOLDER — Quiz mechanic builds in Change 2]
-                </p>
-                <button
-                  className="btn btn-outline btn-sm"
-                  style={{ width: 'auto', margin: '0 auto' }}
-                  onClick={() => setShowQuizPlaceholder(false)}
-                >
-                  Close
-                </button>
-              </div>
-            ) : (
-              <button
-                className="btn btn-primary"
-                onClick={() => setShowQuizPlaceholder(true)}
-              >
-                Take your check-in →
-              </button>
-            )}
+            <button
+              className="btn btn-primary"
+              onClick={() => setQuizStage('perimenopause')}
+            >
+              Take your check-in →
+            </button>
           </div>
         )}
       </div>
