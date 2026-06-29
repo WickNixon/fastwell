@@ -652,7 +652,7 @@ html, body {
 .modal-sheet {
   background-color: var(--surface);
   border-radius: 24px 24px 0 0;
-  padding: 24px 20px 40px;
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
   width: 100%;
   max-width: var(--max-w);
   max-height: 90vh;
