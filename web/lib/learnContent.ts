@@ -15,37 +15,37 @@ export const DAILY_INSIGHTS: Insight[] = [
   {
     id: 'ins-1',
     title: '[PLACEHOLDER] Your body is doing something remarkable right now.',
-    detail: '[PLACEHOLDER] Longer detail for insight 1 goes here. Two short paragraphs explaining the concept in warm, encouraging language. Written for women 40–80 navigating hormonal change. Non-prescriptive, non-alarming.',
+    detail: '[PLACEHOLDER] First sentence of insight 1 detail — sets up the concept in warm, grounded language. [PLACEHOLDER] Second sentence expands on it with a practical observation relevant to women navigating hormonal change. [PLACEHOLDER] Third sentence closes with an encouraging, non-prescriptive note that makes the reader feel informed and supported.',
   },
   {
     id: 'ins-2',
     title: '[PLACEHOLDER] Sleep and hormones are more connected than you think.',
-    detail: '[PLACEHOLDER] Longer detail for insight 2. Explains the relationship between sleep quality and hormonal rhythms during perimenopause and beyond. Warm, actionable, not alarming.',
+    detail: '[PLACEHOLDER] First sentence of insight 2 detail — introduces the connection between sleep and hormones in plain, warm language. [PLACEHOLDER] Second sentence goes deeper on why this matters specifically during the menopause journey, without being alarming. [PLACEHOLDER] Third sentence offers a gentle, actionable takeaway the reader can use today.',
   },
   {
     id: 'ins-3',
     title: '[PLACEHOLDER] What you eat in the morning sets your energy for the day.',
-    detail: '[PLACEHOLDER] Longer detail for insight 3. Covers how morning nutrition choices — especially protein and fat — influence blood sugar and energy through hormonal shifts. Practical and encouraging.',
+    detail: '[PLACEHOLDER] First sentence of insight 3 detail — frames how morning food choices shape energy and blood sugar for the day ahead. [PLACEHOLDER] Second sentence explains why this is particularly relevant during hormonal transition, in a practical and non-judgemental way. [PLACEHOLDER] Third sentence encourages the reader with a specific, easy action they can take at their next meal.',
   },
   {
     id: 'ins-4',
     title: '[PLACEHOLDER] Stress is a hormone too — and it affects everything else.',
-    detail: '[PLACEHOLDER] Longer detail for insight 4. Explains cortisol\'s role in perimenopause and post-menopause, and why managing stress is genuinely physiological, not just mindset work. Compassionate tone.',
+    detail: '[PLACEHOLDER] First sentence of insight 4 detail — explains that stress is a hormonal event, not just a feeling, in a grounded and compassionate way. [PLACEHOLDER] Second sentence describes how cortisol interacts with oestrogen and progesterone during menopause, and why this matters for energy and sleep. [PLACEHOLDER] Third sentence validates what the reader is experiencing and offers a small, practical stress-reduction idea without pressure.',
   },
   {
     id: 'ins-5',
     title: '[PLACEHOLDER] Fasting works differently at different times of your cycle.',
-    detail: '[PLACEHOLDER] Longer detail for insight 5. Introduces the idea of cycle-synced fasting — lighter fasting in the luteal phase, more flexibility in follicular. Grounded in Dr. Mindy Pelz\'s framework.',
+    detail: '[PLACEHOLDER] First sentence of insight 5 detail — introduces the idea that fasting is not one-size-fits-all and varies across the menstrual cycle and hormonal stages. [PLACEHOLDER] Second sentence explains which phases call for lighter fasting and which offer more flexibility, grounded in Dr. Mindy Pelz\'s framework. [PLACEHOLDER] Third sentence reassures the reader that listening to their body is the right instinct, and that Fastwell is designed to help them do exactly that.',
   },
   {
     id: 'ins-6',
     title: '[PLACEHOLDER] Small consistent actions outperform big irregular ones.',
-    detail: '[PLACEHOLDER] Longer detail for insight 6. Encourages consistency over perfection. References research on habit formation and why women in midlife respond especially well to sustainable routines.',
+    detail: '[PLACEHOLDER] First sentence of insight 6 detail — reframes consistency as a gentle, sustainable practice rather than an all-or-nothing performance. [PLACEHOLDER] Second sentence explains why small daily habits compound over time, particularly during hormonal transition when the body benefits most from predictability and routine. [PLACEHOLDER] Third sentence celebrates the reader for showing up at all, and encourages them to keep going without pressure or judgement.',
   },
   {
     id: 'ins-7',
     title: '[PLACEHOLDER] Hydration matters more than you might expect during this stage.',
-    detail: '[PLACEHOLDER] Longer detail for insight 7. Covers how oestrogen affects fluid regulation and why hydration needs can shift during perimenopause. Practical tips without being prescriptive.',
+    detail: '[PLACEHOLDER] First sentence of insight 7 detail — explains that hydration needs change during hormonal transition and this is completely normal, not a sign something is wrong. [PLACEHOLDER] Second sentence describes how oestrogen influences fluid regulation and why symptoms like dryness, bloating, or increased thirst can appear during perimenopause and beyond. [PLACEHOLDER] Third sentence offers a simple, practical hydration habit the reader can try, framed warmly and without prescribing a specific amount.',
   },
 ];
 
@@ -77,28 +77,28 @@ export const STAGE_DEFINITIONS: Record<LearnStageId, StageDefinition> = {
     id: 'regular_cycle',
     label: 'Regular Cycle',
     emoji: '🌙',
-    subtitle: '[PLACEHOLDER] Your hormonal rhythm is one of your greatest assets — when you understand it, you can work with it rather than against it. [PLACEHOLDER] Throughout your cycle, oestrogen, progesterone, and other hormones rise and fall in a predictable pattern that shapes your energy, appetite, sleep, and mood. [PLACEHOLDER] Learning to recognise these natural shifts means you can adapt your fasting, exercise, and nutrition to feel your best at every phase. [PLACEHOLDER] This section will walk you through what\'s happening hormonally at each stage of your cycle, and how to use that knowledge to your advantage.',
+    subtitle: '[PLACEHOLDER] Your hormonal rhythm — understanding what\'s normal for you.',
     colour: '#D9ECE0',
   },
   perimenopause: {
     id: 'perimenopause',
     label: 'Perimenopause',
     emoji: '🌊',
-    subtitle: '[PLACEHOLDER] Perimenopause is the years-long transition leading up to menopause, and it can begin as early as your late 30s — though most women notice changes in their 40s. [PLACEHOLDER] During this phase, oestrogen and progesterone levels become more unpredictable, which is why your periods may change and familiar symptoms like sleep disruption, brain fog, or mood shifts can appear. [PLACEHOLDER] The good news is that lifestyle changes — including fasting, nutrition, and movement — can make a real difference to how you feel day to day. [PLACEHOLDER] This section covers what to expect, what\'s completely normal, and how to support your body through the changes.',
+    subtitle: '[PLACEHOLDER] The transition begins — what to expect and how to feel your best.',
     colour: '#D4E8F0',
   },
   transition: {
     id: 'transition',
     label: 'Transition Year',
     emoji: '🦋',
-    subtitle: '[PLACEHOLDER] The menopause transition — sometimes called the menopausal year — marks the point when your periods have stopped or become very infrequent, as your body completes its hormonal shift. [PLACEHOLDER] This is often when symptoms like hot flushes, night sweats, and sleep disruption are at their most intense, but it is also a turning point — your body is adapting to a new hormonal baseline. [PLACEHOLDER] Many women find that consistent fasting, protein-focused eating, and stress management help significantly during this phase. [PLACEHOLDER] You are not alone in this, and what you\'re experiencing is a natural biological transition that millions of women navigate every year.',
+    subtitle: '[PLACEHOLDER] The year of significant change — you\'re not alone in this.',
     colour: '#F0E8D4',
   },
   post_menopause: {
     id: 'post_menopause',
     label: 'Post-Menopause',
     emoji: '☀️',
-    subtitle: '[PLACEHOLDER] Post-menopause begins after 12 consecutive months without a period, and for many women it brings a welcome sense of stability as the unpredictability of the transition settles. [PLACEHOLDER] Oestrogen levels are now consistently lower, which means your approach to fasting, nutrition, and movement may need some adjustment to keep your energy, bone density, and metabolic health in good shape. [PLACEHOLDER] The lifestyle choices you make in post-menopause have a compounding effect — consistent habits now lay the foundation for the decades ahead. [PLACEHOLDER] This section covers what changes in your body post-menopause, what to prioritise, and how Fastwell can support you in this new chapter.',
+    subtitle: '[PLACEHOLDER] A new chapter of health, energy, and possibility.',
     colour: '#FBE4D6',
   },
 };
