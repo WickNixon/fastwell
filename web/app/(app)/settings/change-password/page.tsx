@@ -4,6 +4,21 @@ import { useState } from 'react';
 import { getSupabase } from '@/lib/supabase-browser';
 import { BackChip } from '../_components';
 
+function EyeIcon({ open }: { open: boolean }) {
+  return open ? (
+    // Eye-off: password is visible, tap to hide
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
+      <path d="M3 3l14 14M8.46 8.52A3 3 0 0011.5 13M4.22 6.22C2.88 7.36 2 8.6 2 10c0 0 2.5 6 8 6a8.4 8.4 0 003.78-.9M7 4.26C7.93 4.1 8.94 4 10 4c5.5 0 8 6 8 6a14.2 14.2 0 01-1.78 2.78" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ) : (
+    // Eye: password is hidden, tap to show
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
+      <path d="M2 10s2.5-6 8-6 8 6 8 6-2.5 6-8 6-8-6-8-6z" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="10" cy="10" r="2.5" stroke="var(--text-muted)" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 export default function ChangePasswordPage() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -50,7 +65,7 @@ export default function ChangePasswordPage() {
           <label className="input-label">New password</label>
           <div className="input-wrapper">
             <input className="input" type={showPass ? 'text' : 'password'} placeholder="At least 8 characters" value={password} onChange={e => setPassword(e.target.value)} required />
-            <button type="button" className="eye-toggle" onClick={() => setShowPass(!showPass)}>{showPass ? '🙈' : '👁'}</button>
+            <button type="button" className="eye-toggle" onClick={() => setShowPass(!showPass)} aria-label={showPass ? 'Hide password' : 'Show password'}><EyeIcon open={showPass} /></button>
           </div>
         </div>
 
@@ -58,7 +73,7 @@ export default function ChangePasswordPage() {
           <label className="input-label">Confirm new password</label>
           <div className="input-wrapper">
             <input className="input" type={showConfirm ? 'text' : 'password'} placeholder="Repeat your password" value={confirm} onChange={e => setConfirm(e.target.value)} required />
-            <button type="button" className="eye-toggle" onClick={() => setShowConfirm(!showConfirm)}>{showConfirm ? '🙈' : '👁'}</button>
+            <button type="button" className="eye-toggle" onClick={() => setShowConfirm(!showConfirm)} aria-label={showConfirm ? 'Hide password' : 'Show password'}><EyeIcon open={showConfirm} /></button>
           </div>
           {confirm && confirm !== password && <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Lato, sans-serif' }}>Passwords don't match</p>}
         </div>
