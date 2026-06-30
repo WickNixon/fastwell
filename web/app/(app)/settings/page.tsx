@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/lib/auth-context';
 import { BackChip, ChevronRight, SettingsGroup, SettingsRow, TierPill } from './_components';
-import pkg from '@/../package.json';
+import pkg from '@/package.json';
 
 export default function SettingsPage() {
   const { profile, signOut } = useAuth();
