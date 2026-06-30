@@ -4,33 +4,29 @@ import { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
 import { BackChip } from '../_components';
+import { resolveSubView, isMemberOrigin } from '@/lib/subscription';
 
-// ─── Plan data (unchanged from original) ─────────────────────────────────────
+// ─── Placeholder prices ────────────────────────────────────────────────────────
+// These are PLACEHOLDERS. Swap for real Stripe price objects in Batch B.
+// One place to update — do not scatter price strings elsewhere.
 
-const NON_MEMBER_PLANS = [
-  { key: 'weekly',  label: 'Weekly',  badge: 'Popular',    duration: '1 Week',  perDay: '$0.61 / day', price: '$4.30',   priceSub: 'per week',            save: null },
-  { key: 'monthly', label: 'Monthly', badge: 'Best Value', duration: '1 Month', perDay: '$0.47 / day', price: '$13.99',  priceSub: 'per month',           save: 'Save 25%' },
-  { key: 'annual',  label: 'Annual',  badge: 'Best Price', duration: '1 Year',  perDay: '$0.33 / day', price: '$117.48', priceSub: 'per year ($9.79/mo)', save: 'Save 47%' },
-];
-
-const MEMBER_PLANS = [
-  { key: 'weekly',  label: 'Weekly',  badge: 'Popular',    duration: '1 Week',  perDay: '$0.31 / day', price: '$2.15',  priceSub: 'per week',            save: null },
-  { key: 'monthly', label: 'Monthly', badge: 'Best Value', duration: '1 Month', perDay: '$0.23 / day', price: '$7.00',  priceSub: 'per month',           save: 'Save 25%' },
-  { key: 'annual',  label: 'Annual',  badge: 'Best Price', duration: '1 Year',  perDay: '$0.16 / day', price: '$58.74', priceSub: 'per year ($4.90/mo)', save: 'Save 47%' },
-];
-
-const FEATURES = [
-  { text: 'Macro image analyser', soon: false },
-  { text: 'Personalised Meal Plans', soon: true },
-  { text: 'Everything in Free — plus more as we grow', soon: false },
-];
+const PRICES = {
+  member: {
+    monthly: { label: '$9.50 / month', sub: '50% member discount' },
+    annual:  { label: '$79.76 / year', sub: '~$6.65/mo · 50% member discount' },
+  },
+  subscriber: {
+    monthly: { label: '$18.99 / month', sub: null },
+    annual:  { label: '$159.52 / year', sub: '~$13.29/mo · save 30%' },
+  },
+} as const;
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
-function ArrowIcon() {
+function SwapIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+      <path d="M3 6h12M11 3l4 3-4 3M15 12H3M7 9l-4 3 4 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -53,14 +49,6 @@ function ReceiptIcon() {
   );
 }
 
-function SwapIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-      <path d="M3 6h12M11 3l4 3-4 3M15 12H3M7 9l-4 3 4 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 function RefreshIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
@@ -69,23 +57,53 @@ function RefreshIcon() {
   );
 }
 
-function CheckIcon() {
+function ArrowIcon() {
   return (
-    <svg width="14" height="11" viewBox="0 0 14 11" fill="none" aria-hidden>
-      <path d="M1 5.5l4 4 8-8" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
-// ─── Action row ───────────────────────────────────────────────────────────────
+// ─── Reusable sub-components ──────────────────────────────────────────────────
 
-function ActionRow({
-  icon,
-  label,
-  sub,
-  onClick,
-  divider = true,
-}: {
+function GreenCard({ label, title, sub, badge }: {
+  label: string;
+  title: string;
+  sub?: string;
+  badge?: string;
+}) {
+  return (
+    <div style={{
+      background: 'var(--primary)',
+      borderRadius: 18,
+      padding: '20px 20px 22px',
+      marginBottom: 20,
+      color: '#fff',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', opacity: 0.75 }}>
+          {label}
+        </span>
+        {badge && (
+          <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 11, background: 'rgba(255,255,255,0.2)', padding: '3px 10px', borderRadius: 20 }}>
+            {badge}
+          </span>
+        )}
+      </div>
+      <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 22, marginBottom: sub ? 6 : 0 }}>
+        {title}
+      </p>
+      {sub && (
+        <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, opacity: 0.85 }}>
+          {sub}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ActionRow({ icon, label, sub, onClick, divider = true }: {
   icon: React.ReactNode;
   label: string;
   sub?: string;
@@ -96,18 +114,12 @@ function ActionRow({
     <button
       onClick={onClick}
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 14,
-        width: '100%',
+        display: 'flex', alignItems: 'center', gap: 14, width: '100%',
         padding: sub ? '14px 16px' : '0 16px',
-        height: sub ? 'auto' : 56,
-        minHeight: 56,
-        background: 'none',
-        border: 'none',
+        height: sub ? 'auto' : 56, minHeight: 56,
+        background: 'none', border: 'none',
         borderBottom: divider ? '1px solid var(--border)' : 'none',
-        cursor: 'pointer',
-        textAlign: 'left',
+        cursor: 'pointer', textAlign: 'left',
       }}
     >
       <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>{icon}</span>
@@ -120,24 +132,64 @@ function ActionRow({
   );
 }
 
+function UpgradeRow({ label, price, sub, onClick, primary = false }: {
+  label: string;
+  price: string;
+  sub?: string | null;
+  onClick: () => void;
+  primary?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        width: '100%', padding: '14px 16px', background: 'none', border: 'none',
+        borderBottom: '1px solid var(--border)', cursor: 'pointer', textAlign: 'left',
+      }}
+    >
+      <span style={{ flex: 1 }}>
+        <span style={{ display: 'block', fontFamily: 'Lato, sans-serif', fontSize: 15, color: 'var(--text)' }}>{label}</span>
+        {sub && <span style={{ display: 'block', fontFamily: 'Lato, sans-serif', fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</span>}
+      </span>
+      <span style={{
+        fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 14,
+        color: primary ? 'var(--primary)' : 'var(--text-muted)', flexShrink: 0, marginLeft: 12,
+      }}>
+        {price}
+      </span>
+    </button>
+  );
+}
+
+function CancelLink({ onClick, loading }: { onClick: () => void; loading: boolean }) {
+  return (
+    <div style={{ textAlign: 'center', marginTop: 20, paddingBottom: 32 }}>
+      <button
+        onClick={onClick}
+        disabled={loading}
+        style={{
+          background: 'none', border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+          fontFamily: 'Lato, sans-serif', fontSize: 14,
+          color: 'var(--accent)', textDecoration: 'underline', opacity: loading ? 0.5 : 1,
+        }}
+      >
+        {loading ? 'Opening portal…' : 'Cancel subscription'}
+      </button>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SettingsSubscriptionPage() {
   const { profile } = useAuth();
-  const [selectedPlan, setSelectedPlan] = useState<'weekly' | 'monthly' | 'annual'>('monthly');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [restoreMsg, setRestoreMsg] = useState('');
 
-  const tier = profile?.subscription_tier ?? 'free';
-  const isMember = tier === 'member_pro';
-  const isPro = tier === 'member_pro' || tier === 'pro';
-  const trialExpired = !isPro && profile?.pro_trial_ends_at
-    ? new Date(profile.pro_trial_ends_at) < new Date()
-    : false;
-
-  const plans = isMember ? MEMBER_PLANS : NON_MEMBER_PLANS;
-  const selected = plans.find(p => p.key === selectedPlan)!;
+  const view = resolveSubView(profile);
+  const isMember = isMemberOrigin(profile);
 
   const openPortal = async () => {
     setLoading(true);
@@ -149,232 +201,195 @@ export default function SettingsSubscriptionPage() {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
       });
       const { url } = await res.json();
-      if (url) {
-        window.location.href = url;
-      } else {
-        setLoading(false);
-        setError('Could not open billing portal. Please try again.');
-      }
+      if (url) { window.location.href = url; }
+      else { setLoading(false); setError('Could not open billing portal. Please try again.'); }
     } catch {
       setLoading(false);
       setError('Could not open billing portal. Please try again.');
     }
   };
 
-  const startCheckout = async () => {
-    if (loading) return;
-    setLoading(true);
-    setError('');
-    try {
-      const { data: { session } } = await getSupabase().auth.getSession();
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-subscriber-checkout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ plan: selectedPlan }),
-      });
-      const json = await res.json();
-      if (json.url) {
-        window.location.href = json.url;
-      } else {
-        setError(json.error ?? 'Something went wrong. Please try again.');
-        setLoading(false);
-      }
-    } catch {
-      setError('Something went wrong. Please try again.');
-      setLoading(false);
-    }
+  const handleUpgrade = () => {
+    // Batch B: wire real checkout here. For now → portal or stub.
+    openPortal();
   };
 
   const handleRestore = () => {
-    setRestoreMsg('Purchases are managed through your billing portal. Tap "Manage payment method" to review your subscription.');
+    setRestoreMsg('Purchases are managed through your billing portal. Tap "Manage payment method" to review.');
     setTimeout(() => setRestoreMsg(''), 5000);
   };
 
-  // ─── Active Pro — plan card + action rows ──────────────────────────────────
+  // Trial days remaining (used for subscriber_trial)
+  const trialDaysLeft = profile?.pro_trial_ends_at
+    ? Math.max(0, Math.ceil((new Date(profile.pro_trial_ends_at).getTime() - Date.now()) / 86400000))
+    : null;
 
-  if (isPro && profile?.stripe_subscription_id) {
-    const planLabel = isMember ? 'Member Pro' : 'Fastwell Pro';
+  const trialEndDate = profile?.pro_trial_ends_at
+    ? new Date(profile.pro_trial_ends_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
+    : null;
 
-    return (
-      <div className="page page-top">
-        <BackChip />
-
-        <h1 style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 26, color: 'var(--text)', margin: '16px 0 24px' }}>
-          Subscription
-        </h1>
-
-        {/* Plan card */}
-        <div style={{
-          background: 'var(--primary)',
-          borderRadius: 18,
-          padding: '20px 20px 22px',
-          marginBottom: 20,
-          color: '#fff',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', opacity: 0.75 }}>
-              Current plan
-            </span>
-            <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 11, background: 'rgba(255,255,255,0.2)', padding: '3px 10px', borderRadius: 20 }}>
-              {isMember ? 'Member' : 'Pro'}
-            </span>
-          </div>
-
-          <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 22, marginBottom: 4 }}>
-            {planLabel}
-          </p>
-          {isMember && (
-            <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 15, opacity: 0.85, marginBottom: 12 }}>
-              50% member discount, forever
-            </p>
-          )}
-
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.2)', margin: '14px 0' }} />
-
-          <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, opacity: 0.75 }}>
-            Next payment · See billing portal for details
-          </p>
-        </div>
-
-        {/* Action rows */}
-        <div style={{ borderRadius: 16, overflow: 'hidden', background: 'var(--surface)', marginBottom: 8 }}>
-          <ActionRow icon={<SwapIcon />} label="Change plan" onClick={openPortal} />
-          <ActionRow icon={<CardIcon />} label="Manage payment method" onClick={openPortal} />
-          <ActionRow icon={<ReceiptIcon />} label="View past invoices" onClick={openPortal} />
-          <ActionRow
-            icon={<RefreshIcon />}
-            label="Restore purchases"
-            sub={restoreMsg || undefined}
-            onClick={handleRestore}
-            divider={false}
-          />
-        </div>
-
-        {error && (
-          <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: '#C62828', textAlign: 'center', margin: '12px 0' }}>{error}</p>
-        )}
-
-        {/* Cancel link */}
-        <div style={{ textAlign: 'center', marginTop: 20, paddingBottom: 32 }}>
-          <button
-            onClick={openPortal}
-            disabled={loading}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontFamily: 'Lato, sans-serif',
-              fontSize: 14,
-              color: 'var(--accent)',
-              textDecoration: 'underline',
-              opacity: loading ? 0.5 : 1,
-            }}
-          >
-            {loading ? 'Opening portal…' : 'Cancel subscription'}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ─── Free / trial — plan selection screen ─────────────────────────────────
+  const memberPrices = PRICES.member;
+  const subPrices    = PRICES.subscriber;
 
   return (
     <div className="page page-top">
       <BackChip />
-
-      <h1 style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 26, color: 'var(--text)', margin: '16px 0 8px', textAlign: 'center' }}>
-        {trialExpired ? 'Your 14 days are up' : 'Upgrade to Pro'}
+      <h1 style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 26, color: 'var(--text)', margin: '16px 0 24px' }}>
+        Subscription
       </h1>
-      <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 15, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 28 }}>
-        {trialExpired ? 'Ready to keep going? Choose a plan to continue.' : 'Try free for 14 days — cancel anytime'}
-      </p>
 
-      {/* Horizontal plan cards */}
-      <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, marginBottom: 28, scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}>
-        {plans.map(plan => {
-          const isSelected = selectedPlan === plan.key;
-          return (
-            <div
-              key={plan.key}
-              onClick={() => setSelectedPlan(plan.key as 'weekly' | 'monthly' | 'annual')}
-              style={{
-                minWidth: 150, maxWidth: 170, flexShrink: 0, padding: '16px 14px',
-                borderRadius: 14, cursor: 'pointer', scrollSnapAlign: 'start',
-                border: `2px solid ${isSelected ? 'var(--primary)' : 'var(--border)'}`,
-                backgroundColor: isSelected ? 'var(--primary-pale)' : 'var(--surface)',
-                position: 'relative',
-              }}
-            >
-              {isSelected && (
-                <span style={{ position: 'absolute', top: 10, right: 10 }}><CheckIcon /></span>
-              )}
-              <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 11, color: 'var(--primary)', marginBottom: 4 }}>
-                {plan.badge}
-              </p>
-              <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 16, color: 'var(--text)', marginBottom: 2 }}>
-                {plan.duration}
-              </p>
-              <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: 'var(--text-muted)', marginBottom: plan.save ? 6 : 0 }}>
-                {plan.perDay}
-              </p>
-              {plan.save && (
-                <span style={{ fontSize: 11, fontFamily: 'Montserrat, sans-serif', fontWeight: 700, color: 'var(--accent)', backgroundColor: '#FFF3E8', padding: '2px 6px', borderRadius: 6, display: 'inline-block', marginBottom: 6 }}>
-                  {plan.save}
-                </span>
-              )}
-              <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 15, color: isSelected ? 'var(--primary)' : 'var(--text)', marginTop: 4 }}>
-                {plan.price}
-              </p>
-              <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 11, color: 'var(--text-muted)' }}>
-                {plan.priceSub}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Feature list */}
-      <div style={{ marginBottom: 28 }}>
-        {FEATURES.map((f, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
-            <span style={{ flexShrink: 0, marginTop: 2 }}><CheckIcon /></span>
-            <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 15, color: 'var(--text)', lineHeight: 1.4 }}>
-              {f.text}{f.soon && <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 6 }}>coming soon</span>}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {/* CTA */}
-      <button
-        onClick={startCheckout}
-        disabled={loading}
-        style={{
-          width: '100%', background: 'var(--primary)', color: '#fff', border: 'none',
-          borderRadius: 14, padding: '14px 20px', cursor: loading ? 'not-allowed' : 'pointer',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-          opacity: loading ? 0.7 : 1,
-        }}
-      >
-        <span style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 17 }}>
-          {loading ? 'Opening Checkout…' : 'Start My Free Trial'}
-        </span>
-        {!loading && (
-          <span style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, opacity: 0.8 }}>
-            14-day free trial · {selected.price} {selected.priceSub} after
-          </span>
-        )}
-      </button>
-
-      {error && (
-        <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: '#C62828', marginTop: 12, textAlign: 'center' }}>{error}</p>
+      {/* ── OWNER ── */}
+      {view === 'owner' && (
+        <>
+          <GreenCard
+            label="Account"
+            title="Owner access"
+            sub="Full access to everything. No billing."
+            badge="Owner"
+          />
+          <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.5 }}>
+            Your account has permanent full access.
+          </p>
+        </>
       )}
 
-      {isMember && (
-        <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', marginTop: 16 }}>
-          Wicked Wellbeing member prices — 50% off forever.
-        </p>
+      {/* ── MEMBER TRIAL ── */}
+      {view === 'member_trial' && (
+        <>
+          <GreenCard
+            label="Current plan"
+            title={`Pro · Free until ${trialEndDate ?? 'end of trial'}`}
+            sub="You're a Wicked Wellbeing member — 50% off after your trial."
+            badge="Member"
+          />
+          <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 8 }}>
+            Lock in your rate after the trial
+          </p>
+          <div style={{ borderRadius: 16, overflow: 'hidden', background: 'var(--surface)', marginBottom: 8 }}>
+            <UpgradeRow label="Monthly" price={memberPrices.monthly.label} sub={memberPrices.monthly.sub} onClick={handleUpgrade} primary />
+            <UpgradeRow label="Annual" price={memberPrices.annual.label} sub={memberPrices.annual.sub} onClick={handleUpgrade} />
+          </div>
+          <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', marginTop: 8 }}>
+            Prices are placeholders — final rates set when billing launches.
+          </p>
+        </>
+      )}
+
+      {/* ── MEMBER PAYING ── */}
+      {view === 'member_paying' && (
+        <>
+          <GreenCard
+            label="Current plan"
+            title="Fastwell Pro · Member"
+            sub="50% member discount, forever."
+            badge="Member"
+          />
+          <div style={{ borderRadius: 16, overflow: 'hidden', background: 'var(--surface)', marginBottom: 8 }}>
+            <ActionRow icon={<SwapIcon />}   label="Change plan"              onClick={openPortal} />
+            <ActionRow icon={<CardIcon />}   label="Manage payment method"    onClick={openPortal} />
+            <ActionRow icon={<ReceiptIcon />}label="View past invoices"       onClick={openPortal} />
+            <ActionRow icon={<RefreshIcon />}label="Restore purchases"        sub={restoreMsg || undefined} onClick={handleRestore} divider={false} />
+          </div>
+          {error && <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: '#C62828', textAlign: 'center', margin: '12px 0' }}>{error}</p>}
+          <CancelLink onClick={openPortal} loading={loading} />
+        </>
+      )}
+
+      {/* ── MEMBER FREE ── */}
+      {view === 'member_free' && (
+        <>
+          <GreenCard
+            label="Current plan"
+            title="Free plan"
+            sub="You're a member — upgrade anytime at 50% off."
+            badge="Member"
+          />
+          <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 8 }}>
+            Upgrade at your member rate
+          </p>
+          <div style={{ borderRadius: 16, overflow: 'hidden', background: 'var(--surface)', marginBottom: 8 }}>
+            <UpgradeRow label="Monthly" price={memberPrices.monthly.label} sub={memberPrices.monthly.sub} onClick={handleUpgrade} primary />
+            <UpgradeRow label="Annual"  price={memberPrices.annual.label}  sub={memberPrices.annual.sub}  onClick={handleUpgrade} />
+          </div>
+          <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', marginTop: 8 }}>
+            Prices are placeholders — final rates set when billing launches.
+          </p>
+        </>
+      )}
+
+      {/* ── SUBSCRIBER TRIAL ── */}
+      {view === 'subscriber_trial' && (
+        <>
+          <GreenCard
+            label="Current plan"
+            title={trialDaysLeft !== null ? `Pro trial · ${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} left` : 'Pro trial'}
+            sub={trialEndDate ? `Trial ends ${trialEndDate}` : undefined}
+          />
+          <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 8 }}>
+            Keep going after your trial
+          </p>
+          <div style={{ borderRadius: 16, overflow: 'hidden', background: 'var(--surface)', marginBottom: 8 }}>
+            <UpgradeRow label="Monthly" price={subPrices.monthly.label} sub={subPrices.monthly.sub} onClick={handleUpgrade} primary />
+            <UpgradeRow label="Annual"  price={subPrices.annual.label}  sub={subPrices.annual.sub}  onClick={handleUpgrade} />
+          </div>
+          <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', marginTop: 8 }}>
+            Prices are placeholders — final rates set when billing launches.
+          </p>
+        </>
+      )}
+
+      {/* ── SUBSCRIBER PAYING ── */}
+      {view === 'subscriber_paying' && (
+        <>
+          <GreenCard label="Current plan" title="Fastwell Pro" />
+          <div style={{ borderRadius: 16, overflow: 'hidden', background: 'var(--surface)', marginBottom: 8 }}>
+            <ActionRow icon={<SwapIcon />}   label="Change plan"              onClick={openPortal} />
+            <ActionRow icon={<CardIcon />}   label="Manage payment method"    onClick={openPortal} />
+            <ActionRow icon={<ReceiptIcon />}label="View past invoices"       onClick={openPortal} />
+            <ActionRow icon={<RefreshIcon />}label="Restore purchases"        sub={restoreMsg || undefined} onClick={handleRestore} divider={false} />
+          </div>
+          {error && <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: '#C62828', textAlign: 'center', margin: '12px 0' }}>{error}</p>}
+          <CancelLink onClick={openPortal} loading={loading} />
+        </>
+      )}
+
+      {/* ── SUBSCRIBER FREE ── */}
+      {view === 'subscriber_free' && (
+        <>
+          <GreenCard
+            label="Current plan"
+            title="Free plan"
+            sub={isMember ? 'Upgrade anytime at your 50% member rate.' : 'Upgrade to Pro for full access.'}
+          />
+          <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 8 }}>
+            Upgrade to Pro
+          </p>
+          <div style={{ borderRadius: 16, overflow: 'hidden', background: 'var(--surface)', marginBottom: 8 }}>
+            <UpgradeRow label="Monthly" price={isMember ? memberPrices.monthly.label : subPrices.monthly.label} sub={isMember ? memberPrices.monthly.sub : subPrices.monthly.sub} onClick={handleUpgrade} primary />
+            <UpgradeRow label="Annual"  price={isMember ? memberPrices.annual.label  : subPrices.annual.label}  sub={isMember ? memberPrices.annual.sub  : subPrices.annual.sub}  onClick={handleUpgrade} />
+          </div>
+          <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', marginTop: 8 }}>
+            Prices are placeholders — final rates set when billing launches.
+          </p>
+        </>
+      )}
+
+      {/* ── INACTIVE ── */}
+      {view === 'inactive' && (
+        <>
+          <GreenCard label="Account status" title="Access paused" sub="Reactivate below to get back in." />
+          <div style={{ borderRadius: 16, overflow: 'hidden', background: 'var(--surface)', marginBottom: 8 }}>
+            <UpgradeRow label="Reactivate — Monthly" price={isMember ? memberPrices.monthly.label : subPrices.monthly.label} sub={null} onClick={handleUpgrade} primary />
+            <UpgradeRow label="Reactivate — Annual"  price={isMember ? memberPrices.annual.label  : subPrices.annual.label}  sub={null} onClick={handleUpgrade} />
+          </div>
+          <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', marginTop: 8 }}>
+            Prices are placeholders — final rates set when billing launches.
+          </p>
+        </>
+      )}
+
+      {error && view !== 'member_paying' && view !== 'subscriber_paying' && (
+        <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 13, color: '#C62828', textAlign: 'center', margin: '12px 0' }}>{error}</p>
       )}
     </div>
   );
