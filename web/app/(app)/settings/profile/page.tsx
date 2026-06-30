@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { BackChip } from '../_components';
 import { createClient } from '@/lib/supabase';
-import AgeTumbler from '@/components/AgeTumbler';
 
 const STAGES = [
   { key: 'perimenopause', label: 'Perimenopause' },
@@ -34,13 +33,70 @@ const GOAL_OPTIONS = [
   { key: 'all', label: 'All of the above' },
 ];
 
+// ─── Select row — label + current value + chevron; native picker on tap ────────
+
+function ChevronDown() {
+  return (
+    <svg width="12" height="8" viewBox="0 0 12 8" fill="none" aria-hidden>
+      <path d="M1 1l5 5 5-5" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function SelectRow({
+  label,
+  value,
+  options,
+  onChange,
+  divider = true,
+}: {
+  label: string;
+  value: string;
+  options: { key: string; label: string }[];
+  onChange: (val: string) => void;
+  divider?: boolean;
+}) {
+  const selectedLabel = options.find(o => o.key === value)?.label ?? '';
+  return (
+    <div style={{ position: 'relative', borderBottom: divider ? '1px solid var(--border)' : 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', height: 56, padding: '0 16px', gap: 12, pointerEvents: 'none' }}>
+        <span style={{ flex: 1, fontFamily: 'Lato, sans-serif', fontSize: 15, color: 'var(--text)' }}>{label}</span>
+        <span style={{ fontFamily: 'Lato, sans-serif', fontSize: 15, color: selectedLabel ? 'var(--text-muted)' : 'var(--border)' }}>
+          {selectedLabel || 'Select'}
+        </span>
+        <ChevronDown />
+      </div>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        aria-label={label}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          opacity: 0,
+          cursor: 'pointer',
+          width: '100%',
+          height: '100%',
+          fontSize: 16, // prevent iOS zoom
+        }}
+      >
+        <option value="" disabled>{label}</option>
+        {options.map(o => (
+          <option key={o.key} value={o.key}>{o.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function SettingsProfilePage() {
   const { profile, refreshProfile } = useAuth();
   const supabase = createClient();
 
   const [firstName, setFirstName] = useState('');
   const [age, setAge] = useState(52);
-  const handleAgeChange = useCallback((val: number) => setAge(val), []);
   const [stage, setStage] = useState('');
   const [cycle, setCycle] = useState('');
   const [hrt, setHrt] = useState('');
@@ -61,6 +117,12 @@ export default function SettingsProfilePage() {
       setWeightUnit(profile.weight_unit ?? 'kg');
     }
   }, [profile]);
+
+  // Stable handler (no AgeTumbler useCallback needed — just a plain setter now)
+  const handleAgeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = parseInt(e.target.value, 10);
+    if (!Number.isNaN(v)) setAge(Math.max(18, Math.min(97, v)));
+  }, []);
 
   const save = async () => {
     if (!profile) return;
@@ -90,12 +152,17 @@ export default function SettingsProfilePage() {
   return (
     <div className="page page-top">
       <BackChip />
-      <h1 className="h1 mb-8" style={{ marginTop: 16 }}>Profile</h1>
-      <p className="body-sm mb-24">Your details from setup — tap any field to update.</p>
+
+      <h1 style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 26, color: 'var(--text)', margin: '16px 0 6px' }}>
+        Profile
+      </h1>
+      <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 14, color: 'var(--text-muted)', marginBottom: 24, lineHeight: 1.5 }}>
+        Your details from setup — tap any field to update.
+      </p>
 
       {saved && (
         <div style={{ background: 'var(--primary-pale)', border: '1px solid var(--border)', color: 'var(--primary)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 14, fontFamily: 'Lato, sans-serif' }}>
-          ✓ Changes saved
+          Changes saved
         </div>
       )}
       {saveError && (
@@ -104,104 +171,111 @@ export default function SettingsProfilePage() {
         </div>
       )}
 
-      <div className="input-group">
-        <label className="input-label">First name</label>
-        <input className="input" type="text" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Your first name" />
-      </div>
+      {/* Account section */}
+      <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 8 }}>
+        About you
+      </p>
+      <div style={{ borderRadius: 16, overflow: 'hidden', background: 'var(--surface)', marginBottom: 20 }}>
 
-      <div className="input-group">
-        <label className="input-label">Age</label>
-        <AgeTumbler value={age} onChange={handleAgeChange} />
-      </div>
+        {/* First name — text field row */}
+        <div style={{ display: 'flex', alignItems: 'center', height: 56, padding: '0 16px', gap: 12, borderBottom: '1px solid var(--border)' }}>
+          <span style={{ flex: 1, fontFamily: 'Lato, sans-serif', fontSize: 15, color: 'var(--text)', flexShrink: 0 }}>First name</span>
+          <input
+            type="text"
+            value={firstName}
+            onChange={e => setFirstName(e.target.value)}
+            placeholder="Your name"
+            style={{
+              border: 'none',
+              outline: 'none',
+              background: 'transparent',
+              fontFamily: 'Lato, sans-serif',
+              fontSize: 15,
+              color: 'var(--text-muted)',
+              textAlign: 'right',
+              width: 160,
+              padding: 0,
+            }}
+          />
+        </div>
 
-      <div className="input-group">
-        <label className="input-label">Menopause stage</label>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {STAGES.map(s => (
-            <button key={s.key} onClick={() => setStage(s.key)} style={{
-              padding: '12px 16px', borderRadius: 10, textAlign: 'left',
-              border: `2px solid ${stage === s.key ? 'var(--primary)' : 'var(--border)'}`,
-              backgroundColor: stage === s.key ? 'var(--primary-pale)' : 'var(--surface)',
-              fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14,
-              color: stage === s.key ? 'var(--primary)' : 'var(--text)', cursor: 'pointer',
-            }}>
-              {s.label}
-            </button>
-          ))}
+        {/* Age — number input row */}
+        <div style={{ display: 'flex', alignItems: 'center', height: 56, padding: '0 16px', gap: 12 }}>
+          <span style={{ flex: 1, fontFamily: 'Lato, sans-serif', fontSize: 15, color: 'var(--text)' }}>Age</span>
+          <input
+            type="number"
+            min={18}
+            max={97}
+            value={age}
+            onChange={handleAgeChange}
+            style={{
+              border: 'none',
+              outline: 'none',
+              background: 'transparent',
+              fontFamily: 'Lato, sans-serif',
+              fontSize: 15,
+              color: 'var(--text-muted)',
+              textAlign: 'right',
+              width: 60,
+              padding: 0,
+              MozAppearance: 'textfield',
+            }}
+          />
         </div>
       </div>
 
-      {!isPostMeno && (
-        <div className="input-group">
-          <label className="input-label">Are you still getting a period?</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {CYCLE_OPTIONS.map(o => (
-              <button key={o.key} onClick={() => setCycle(o.key)} style={{
-                padding: '12px 16px', borderRadius: 10, textAlign: 'left',
-                border: `2px solid ${cycle === o.key ? 'var(--primary)' : 'var(--border)'}`,
-                backgroundColor: cycle === o.key ? 'var(--primary-pale)' : 'var(--surface)',
-                fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14,
-                color: cycle === o.key ? 'var(--primary)' : 'var(--text)', cursor: 'pointer',
-              }}>
-                {o.label}
+      {/* Health section */}
+      <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 8 }}>
+        Health details
+      </p>
+      <div style={{ borderRadius: 16, overflow: 'hidden', background: 'var(--surface)', marginBottom: 20 }}>
+        <SelectRow label="Menopause stage" value={stage} options={STAGES} onChange={setStage} />
+        {!isPostMeno && (
+          <SelectRow label="Still getting a period?" value={cycle} options={CYCLE_OPTIONS} onChange={setCycle} />
+        )}
+        <SelectRow label="Using HRT or bioidenticals?" value={hrt} options={HRT_OPTIONS} onChange={setHrt} divider={false} />
+      </div>
+
+      {/* Goals & units section */}
+      <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 8 }}>
+        Goals & units
+      </p>
+      <div style={{ borderRadius: 16, overflow: 'hidden', background: 'var(--surface)', marginBottom: 28 }}>
+        <SelectRow label="Primary goal" value={goal} options={GOAL_OPTIONS} onChange={setGoal} />
+
+        {/* Weight unit — 2-option inline toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', height: 56, padding: '0 16px', gap: 12 }}>
+          <span style={{ flex: 1, fontFamily: 'Lato, sans-serif', fontSize: 15, color: 'var(--text)' }}>Weight unit</span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {(['kg', 'lbs'] as const).map(u => (
+              <button
+                key={u}
+                onClick={() => setWeightUnit(u)}
+                style={{
+                  padding: '6px 16px',
+                  borderRadius: 20,
+                  border: `1.5px solid ${weightUnit === u ? 'var(--primary)' : 'var(--border)'}`,
+                  background: weightUnit === u ? 'var(--primary-pale)' : 'transparent',
+                  color: weightUnit === u ? 'var(--primary)' : 'var(--text-muted)',
+                  fontFamily: 'Montserrat, sans-serif',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                {u}
               </button>
             ))}
           </div>
         </div>
-      )}
-
-      <div className="input-group">
-        <label className="input-label">Using HRT or bioidentical hormones?</label>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {HRT_OPTIONS.map(o => (
-            <button key={o.key} onClick={() => setHrt(o.key)} style={{
-              flex: 1, padding: '12px 4px', borderRadius: 10,
-              border: `2px solid ${hrt === o.key ? 'var(--primary)' : 'var(--border)'}`,
-              backgroundColor: hrt === o.key ? 'var(--primary-pale)' : 'var(--surface)',
-              fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 13,
-              color: hrt === o.key ? 'var(--primary)' : 'var(--text)', cursor: 'pointer',
-            }}>
-              {o.label}
-            </button>
-          ))}
-        </div>
       </div>
 
-      <div className="input-group">
-        <label className="input-label">Primary goal</label>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {GOAL_OPTIONS.map(o => (
-            <button key={o.key} onClick={() => setGoal(o.key)} style={{
-              padding: '12px 16px', borderRadius: 10, textAlign: 'left',
-              border: `2px solid ${goal === o.key ? 'var(--primary)' : 'var(--border)'}`,
-              backgroundColor: goal === o.key ? 'var(--primary-pale)' : 'var(--surface)',
-              fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 14,
-              color: goal === o.key ? 'var(--primary)' : 'var(--text)', cursor: 'pointer',
-            }}>
-              {o.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="input-group">
-        <label className="input-label">Weight units</label>
-        <div style={{ display: 'flex', gap: 10 }}>
-          {['kg', 'lbs'].map(u => (
-            <button key={u} onClick={() => setWeightUnit(u)} style={{
-              flex: 1, padding: '12px 0', borderRadius: 10,
-              border: `2px solid ${weightUnit === u ? 'var(--primary)' : 'var(--border)'}`,
-              backgroundColor: weightUnit === u ? 'var(--primary-pale)' : 'var(--surface)',
-              fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 15,
-              color: weightUnit === u ? 'var(--primary)' : 'var(--text)', cursor: 'pointer',
-            }}>
-              {u}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <button className="btn btn-primary mt-8" onClick={save} disabled={saving}>
+      <button
+        className="btn btn-primary"
+        onClick={save}
+        disabled={saving}
+        style={{ marginBottom: 32 }}
+      >
         {saving ? 'Saving…' : 'Save changes'}
       </button>
     </div>
