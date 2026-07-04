@@ -59,8 +59,10 @@ export default function EducationPage() {
   const forYouContent = forYouId ? STAGE_CONTENT[forYouId] : null;
   const insightStageId = forYouId ?? DEFAULT_INSIGHT_STAGE;
 
+  // When the user's stage is unknown, there's no "own stage" to exclude — show
+  // all four so Explore is never empty.
   const exploreStages = ALL_STAGES
-    .filter(id => id !== forYouId)
+    .filter(id => forYouId === null || id !== forYouId)
     .map(id => STAGE_CONTENT[id].definition);
 
   const [activeExplore, setActiveExplore] = useState<LearnStageId | null>(null);
@@ -77,16 +79,6 @@ export default function EducationPage() {
           setRecheckOpen(false);
         }}
         onClose={() => setRecheckOpen(false)}
-      />
-    );
-  }
-
-  // Explore stage detail
-  if (activeExplore) {
-    return (
-      <ExploreSheet
-        stageId={activeExplore}
-        onClose={() => setActiveExplore(null)}
       />
     );
   }
@@ -281,7 +273,7 @@ export default function EducationPage() {
                   color: 'var(--text-muted)',
                   lineHeight: 1.4,
                 }}>
-                  {stage.subtitle}
+                  {STAGE_EXPLAINERS[stage.id].card}
                 </p>
               </div>
               <span style={{ color: 'var(--text-muted)', fontSize: 20, flexShrink: 0 }}>›</span>
@@ -289,6 +281,14 @@ export default function EducationPage() {
           ))}
         </div>
       </div>
+
+      {activeExplore && (
+        <ExplainerSheet
+          definition={STAGE_CONTENT[activeExplore].definition}
+          explainer={STAGE_EXPLAINERS[activeExplore]}
+          onClose={() => setActiveExplore(null)}
+        />
+      )}
     </div>
   );
 }
@@ -490,113 +490,6 @@ function RecheckFlow({
             {saveError}
           </p>
         )}
-      </div>
-    </div>
-  );
-}
-
-// ── Explore slide-up sheet ────────────────────────────────────────────────────
-
-function ExploreSheet({
-  stageId,
-  onClose,
-}: {
-  stageId: LearnStageId;
-  onClose: () => void;
-}) {
-  const { definition } = STAGE_CONTENT[stageId];
-
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 200,
-        backgroundColor: 'var(--bg)',
-        overflowY: 'auto',
-        animation: 'slideUp 0.25s ease-out',
-        maxWidth: 480,
-        margin: '0 auto',
-      }}
-    >
-      <style>{`@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }`}</style>
-
-      {/* Sticky header */}
-      <div
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 10,
-          backgroundColor: definition.colour,
-          padding: '16px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          borderBottom: '1px solid var(--border)',
-        }}
-      >
-        <button
-          onClick={onClose}
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: 4,
-            color: 'var(--text)',
-            flexShrink: 0,
-          }}
-          aria-label="Back"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{ width: 22, height: 22 }}
-          >
-            <path d="M19 12H5M12 5l-7 7 7 7" />
-          </svg>
-        </button>
-        <span style={{ fontSize: 24 }}>{definition.emoji}</span>
-        <p style={{
-          fontFamily: 'Montserrat, sans-serif',
-          fontWeight: 700,
-          fontSize: 17,
-          color: 'var(--text)',
-          flex: 1,
-        }}>
-          {definition.label}
-        </p>
-      </div>
-
-      {/* Content */}
-      <div style={{ padding: '24px 20px 80px' }}>
-        <p style={{
-          fontFamily: 'Lato, sans-serif',
-          fontSize: 15,
-          color: 'var(--text)',
-          lineHeight: 1.6,
-          marginBottom: 24,
-        }}>
-          {definition.subtitle}
-        </p>
-
-        <div
-          style={{
-            backgroundColor: 'var(--primary-pale)',
-            borderRadius: 12,
-            padding: '20px',
-            textAlign: 'center',
-            fontFamily: 'Lato, sans-serif',
-            fontSize: 14,
-            color: 'var(--text)',
-            lineHeight: 1.6,
-          }}
-        >
-          [PLACEHOLDER — Full stage content goes here in Phase 2]
-        </div>
       </div>
     </div>
   );
