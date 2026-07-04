@@ -2,15 +2,14 @@
 
 import { useRef, useState } from 'react';
 import { useSwipeable } from 'react-swipeable';
-import { DAILY_INSIGHTS } from '@/lib/learnContent';
+import type { Insight } from '@/lib/learnContent';
 
 // Stable per UTC day; changes at UTC midnight (close enough for NZ users)
 function getDailyBaseIndex(poolLength: number): number {
   return Math.floor(Date.now() / 86400000) % poolLength;
 }
 
-export default function InsightCard() {
-  const pool = DAILY_INSIGHTS;
+export default function InsightCard({ pool }: { pool: Insight[] }) {
   const base = getDailyBaseIndex(pool.length);
   const [offset, setOffset] = useState(0);
   const [detailOpen, setDetailOpen] = useState(false);

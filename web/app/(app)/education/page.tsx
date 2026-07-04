@@ -8,8 +8,13 @@ import {
   ALL_STAGES,
   MENOPAUSE_STAGE_TO_LEARN_ID,
   STAGE_CONTENT,
+  STAGE_INSIGHTS,
   type LearnStageId,
 } from '@/lib/learnContent';
+
+// Safe fallback when the user's stage is missing/unknown (e.g. 'not_sure' or no
+// profile yet) — Insight of the Day should never render empty.
+const DEFAULT_INSIGHT_STAGE: LearnStageId = 'perimenopause';
 import StageQuiz from './StageQuiz';
 import InsightCard from './InsightCard';
 
@@ -50,6 +55,7 @@ export default function EducationPage() {
     ? (MENOPAUSE_STAGE_TO_LEARN_ID[profile.menopause_stage] ?? null)
     : null;
   const forYouContent = forYouId ? STAGE_CONTENT[forYouId] : null;
+  const insightStageId = forYouId ?? DEFAULT_INSIGHT_STAGE;
 
   const exploreStages = ALL_STAGES
     .filter(id => id !== forYouId)
@@ -150,6 +156,12 @@ export default function EducationPage() {
           {checkinSaveError}
         </div>
       )}
+
+      {/* ── INSIGHT OF THE DAY ───────────────────────────────────────────── */}
+      <div style={{ marginBottom: 32 }}>
+        <p className="section-label" style={{ marginBottom: 12 }}>Insight of the Day</p>
+        <InsightCard pool={STAGE_INSIGHTS[insightStageId]} />
+      </div>
 
       {/* ── RE-CHECK CARD (shown when due) ───────────────────────────────── */}
       {recheckDue && (
@@ -258,9 +270,6 @@ export default function EducationPage() {
                 </button>
               )}
             </div>
-
-            {/* Daily insight card */}
-            <InsightCard />
           </>
         ) : (
           /* not_sure or null — gentle default */
