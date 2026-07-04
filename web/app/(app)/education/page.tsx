@@ -9,14 +9,16 @@ import {
   MENOPAUSE_STAGE_TO_LEARN_ID,
   STAGE_CONTENT,
   STAGE_INSIGHTS,
+  STAGE_EXPLAINERS,
   type LearnStageId,
+  type StageDefinition,
+  type StageExplainer,
 } from '@/lib/learnContent';
+import InsightCard from './InsightCard';
 
 // Safe fallback when the user's stage is missing/unknown (e.g. 'not_sure' or no
 // profile yet) — Insight of the Day should never render empty.
 const DEFAULT_INSIGHT_STAGE: LearnStageId = 'perimenopause';
-import StageQuiz from './StageQuiz';
-import InsightCard from './InsightCard';
 
 // ── Re-check interval ────────────────────────────────────────────────────────
 // Change this single constant to adjust the re-check frequency.
@@ -61,50 +63,9 @@ export default function EducationPage() {
     .filter(id => id !== forYouId)
     .map(id => STAGE_CONTENT[id].definition);
 
-  const [quizStage, setQuizStage] = useState<LearnStageId | null>(null);
   const [activeExplore, setActiveExplore] = useState<LearnStageId | null>(null);
   const [recheckOpen, setRecheckOpen] = useState(false);
-  const [checkinSaveError, setCheckinSaveError] = useState('');
-
-  // Derived from profile — no local state needed. Stage change naturally invalidates
-  // because forYouId changes and the new stage won't have a key in the JSONB yet.
-  const quizCompleted = !!(forYouId && profile?.learn_checkin_completed?.[forYouId]);
-
-  const handleQuizComplete = () => {
-    setQuizStage(null); // close quiz optimistically
-    if (!forYouId || !profile) return;
-    setCheckinSaveError('');
-
-    const updated = { ...(profile.learn_checkin_completed ?? {}), [forYouId]: new Date().toISOString() };
-
-    getSupabase()
-      .from('profiles')
-      .update({ learn_checkin_completed: updated })
-      .eq('id', profile.id)
-      .then(({ error }) => {
-        if (error) {
-          console.error('learn check-in save error:', error);
-          setCheckinSaveError('Your check-in couldn\'t be saved. Please refresh and try again.');
-        } else {
-          refreshProfile();
-        }
-      });
-  };
-
-  // Quiz screen
-  if (quizStage) {
-    const content = STAGE_CONTENT[quizStage];
-    return (
-      <StageQuiz
-        stageLabel={content.definition.label}
-        stageEmoji={content.definition.emoji}
-        stageColour={content.definition.colour}
-        questions={content.quiz}
-        onClose={() => setQuizStage(null)}
-        onComplete={handleQuizComplete}
-      />
-    );
-  }
+  const [explainerOpen, setExplainerOpen] = useState(false);
 
   // Re-check flow (full screen)
   if (recheckOpen) {
@@ -137,25 +98,6 @@ export default function EducationPage() {
         <h1 className="h1" style={{ marginBottom: 4 }}>Learn</h1>
         <p className="body-sm">Your stage, your way — one idea at a time.</p>
       </div>
-
-      {/* ── CHECK-IN SAVE ERROR (shown if Supabase write failed) ─────────── */}
-      {checkinSaveError && (
-        <div
-          style={{
-            backgroundColor: '#FBE4D6',
-            border: '1px solid var(--accent)',
-            borderRadius: 12,
-            padding: '12px 16px',
-            marginBottom: 16,
-            fontFamily: 'Lato, sans-serif',
-            fontSize: 14,
-            color: 'var(--text)',
-            lineHeight: 1.5,
-          }}
-        >
-          {checkinSaveError}
-        </div>
-      )}
 
       {/* ── INSIGHT OF THE DAY ───────────────────────────────────────────── */}
       <div style={{ marginBottom: 32 }}>
@@ -210,11 +152,17 @@ export default function EducationPage() {
       <div style={{ marginBottom: 32 }}>
         <p className="section-label" style={{ marginBottom: 12 }}>For You</p>
 
-        {forYouContent ? (
+        {forYouContent && forYouId ? (
           <>
-            {/* Hero card for the user's stage */}
-            <div
+            {/* Hero card for the user's stage — tap to expand the full explainer */}
+            <button
+              onClick={() => setExplainerOpen(true)}
               style={{
+                display: 'block',
+                width: '100%',
+                textAlign: 'left',
+                border: 'none',
+                cursor: 'pointer',
                 backgroundColor: forYouContent.definition.colour,
                 borderRadius: 'var(--radius)',
                 padding: '20px',
@@ -237,39 +185,25 @@ export default function EducationPage() {
                 fontSize: 14,
                 color: 'var(--text)',
                 lineHeight: 1.55,
-                marginBottom: 16,
+                marginBottom: 12,
               }}>
-                {forYouContent.definition.subtitle}
+                {STAGE_EXPLAINERS[forYouId].card}
               </p>
-              {quizCompleted ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 0 10px' }}>
-                    <span style={{ color: 'var(--primary)', fontSize: 18, lineHeight: 1 }}>✓</span>
-                    <p style={{
-                      fontFamily: 'Montserrat, sans-serif',
-                      fontWeight: 600,
-                      fontSize: 14,
-                      color: 'var(--primary)',
-                    }}>
-                      Check-in complete
-                    </p>
-                  </div>
-                  <button
-                    className="btn btn-outline"
-                    onClick={() => setQuizStage(forYouId)}
-                  >
-                    Take it again
-                  </button>
-                </div>
-              ) : (
-                <button
-                  className="btn btn-primary"
-                  onClick={() => setQuizStage(forYouId)}
-                >
-                  Start your check-in →
-                </button>
-              )}
-            </div>
+              <span style={{
+                fontFamily: 'Lato, sans-serif',
+                fontSize: 12,
+                color: 'var(--text-muted)',
+              }}>
+                Tap to read more
+              </span>
+            </button>
+            {explainerOpen && (
+              <ExplainerSheet
+                definition={forYouContent.definition}
+                explainer={STAGE_EXPLAINERS[forYouId]}
+                onClose={() => setExplainerOpen(false)}
+              />
+            )}
           </>
         ) : (
           /* not_sure or null — gentle default */
@@ -354,6 +288,52 @@ export default function EducationPage() {
             </button>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Explainer detail sheet (tap-to-expand, same pattern as InsightCard) ────────
+
+function ExplainerSheet({
+  definition,
+  explainer,
+  onClose,
+}: {
+  definition: StageDefinition;
+  explainer: StageExplainer;
+  onClose: () => void;
+}) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+        <div className="modal-handle" />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <span style={{ fontSize: 26 }}>{definition.emoji}</span>
+          <p style={{
+            fontFamily: 'Montserrat, sans-serif',
+            fontWeight: 700,
+            fontSize: 17,
+            color: 'var(--text)',
+          }}>
+            {definition.label}
+          </p>
+        </div>
+
+        <p style={{
+          fontFamily: 'Lato, sans-serif',
+          fontSize: 15,
+          color: 'var(--text)',
+          lineHeight: 1.65,
+          marginBottom: 28,
+        }}>
+          {explainer.detail}
+        </p>
+
+        <button className="btn btn-outline" onClick={onClose}>
+          Close
+        </button>
       </div>
     </div>
   );
