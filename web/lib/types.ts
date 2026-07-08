@@ -29,6 +29,7 @@ export interface Profile {
   access_state: 'trial' | 'pro' | 'free' | 'inactive' | null;
   trends_prefs?: { visible?: string[] } | null;
   notification_prefs?: Record<string, boolean> | null;
+  cycle_tracking_mode: 'period' | 'symptom' | null;
   created_at: string;
   updated_at: string;
 }
@@ -69,6 +70,16 @@ export interface SymptomLog {
   severity: number;
   notes: string | null;
   created_at: string;
+}
+
+export interface PeriodLog {
+  id: string;
+  user_id: string;
+  entry_date: string;
+  status: 'start' | 'ongoing' | 'end';
+  flow: 'light' | 'medium' | 'heavy' | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Biomarker {
