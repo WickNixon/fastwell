@@ -7,8 +7,80 @@ import { todayNZ } from '@/lib/dateNZ';
 import { BackChip } from '../settings/_components';
 import {
   getUserHabits, habitColour, habitGoalNumber, buildHabitValueMap,
+  activeDaysSet, currentStreak, bestStreak, averageCompletionRate,
   type HabitDef, type ValueMap,
 } from '@/lib/resultsHabits';
+
+function toISO(d: Date) {
+  return d.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' });
+}
+
+function daysInMonthGrid(monthDate: Date): (Date | null)[] {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const firstOfMonth = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const leadIn = (firstOfMonth.getDay() + 6) % 7; // Monday-first
+  const cells: (Date | null)[] = [];
+  for (let i = 0; i < leadIn; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
+  return cells;
+}
+
+// ─── Small stat card ────────────────────────────────────────────────────────
+
+function StatCard({ label, value, colour }: { label: string; value: string; colour?: string }) {
+  return (
+    <div className="card" style={{ padding: '14px 12px', textAlign: 'center' }}>
+      <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 22, color: colour ?? 'var(--text)', lineHeight: 1.1 }}>
+        {value}
+      </p>
+      <p style={{ fontFamily: 'Lato, sans-serif', fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
+        {label}
+      </p>
+    </div>
+  );
+}
+
+// ─── Small month calendar (Overall — dots only, no per-habit detail) ───────
+
+function SmallMonthCalendar({ month, activeDates, today, colour = 'var(--primary)' }: {
+  month: Date; activeDates: Set<string>; today: string; colour?: string;
+}) {
+  const cells = useMemo(() => daysInMonthGrid(month), [month]);
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 4 }}>
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+          <div key={i} style={{ textAlign: 'center', fontSize: 10, color: 'var(--text-muted)', fontFamily: 'Montserrat, sans-serif', fontWeight: 600 }}>{d}</div>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
+        {cells.map((d, i) => {
+          if (!d) return <div key={i} />;
+          const iso = toISO(d);
+          const isToday = iso === today;
+          const active = activeDates.has(iso);
+          return (
+            <div
+              key={i}
+              style={{
+                aspectRatio: '1', borderRadius: 8,
+                border: isToday ? `1.5px solid ${colour}` : '1px solid var(--border)',
+                backgroundColor: active ? colour : 'var(--surface)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: 'Lato, sans-serif', fontSize: 11, fontWeight: isToday ? 700 : 400,
+                color: active ? '#FFFFFF' : 'var(--text-muted)',
+              }}
+            >
+              {d.getDate()}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function ChevronDown() {
   return (
@@ -59,10 +131,51 @@ function ResultsDropdown({
 // ─── Overall view (filled in Change 2) ──────────────────────────────────────
 
 function OverallView({ habits, valueMap, goals, today }: { habits: HabitDef[]; valueMap: ValueMap; goals: Record<string, number>; today: string }) {
-  void habits; void valueMap; void goals; void today;
+  const habitKeys = habits.map(h => h.key);
+  const activeDates = useMemo(() => activeDaysSet(habitKeys, valueMap, goals), [habitKeys, valueMap, goals]);
+
+  const monthStart = toISO(new Date(new Date(today).getFullYear(), new Date(today).getMonth(), 1));
+  const successThisMonth = useMemo(
+    () => Array.from(activeDates).filter(d => d >= monthStart && d <= today).length,
+    [activeDates, monthStart, today]
+  );
+  const totalSuccess = activeDates.size;
+  const streak = useMemo(() => currentStreak(activeDates, today), [activeDates, today]);
+  const best = useMemo(() => bestStreak(activeDates), [activeDates]);
+  const monthlyRate = useMemo(
+    () => habitKeys.length > 0 ? averageCompletionRate(habitKeys, valueMap, goals, monthStart, today) : 0,
+    [habitKeys, valueMap, goals, monthStart, today]
+  );
+
+  if (habits.length === 0) {
+    return (
+      <div className="card-lg">
+        <p className="body-sm">Add a habit from Home to start seeing your progress here.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="card-lg">
-      <p className="body-sm">Overall stats coming next.</p>
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+        <StatCard label="Success this month" value={String(successThisMonth)} colour="var(--primary)" />
+        <StatCard label="Total success" value={String(totalSuccess)} colour="var(--primary)" />
+        <StatCard label="Current streak" value={`${streak} day${streak === 1 ? '' : 's'}`} colour="var(--primary-deep)" />
+        <StatCard label="Best streak" value={`${best} day${best === 1 ? '' : 's'}`} colour="var(--primary-deep)" />
+      </div>
+      <div className="card-lg" style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
+          <p className="section-label" style={{ marginBottom: 0 }}>Monthly rate</p>
+          <p style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 20, color: 'var(--primary)' }}>{monthlyRate}%</p>
+        </div>
+        <p className="body-sm">Averaged across your {habitKeys.length} active habit{habitKeys.length === 1 ? '' : 's'} this month.</p>
+      </div>
+      <div className="section">
+        <p className="section-label">Active days this month</p>
+        <div className="card">
+          <SmallMonthCalendar month={new Date(today)} activeDates={activeDates} today={today} />
+        </div>
+      </div>
     </div>
   );
 }
