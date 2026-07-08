@@ -1043,3 +1043,22 @@ If no prefs saved: default to Fasting, Water, Sleep, Exercise.
 - [ ] Customise selection persists on reload
 - [ ] Default order: Fasting, Water, Sleep, Exercise
 - [ ] Zero build errors — committed and deployed ✓
+
+---
+
+**2026-07-08 — Tracking tab rebuild: parked items (not moved this build)**
+As part of the cycle/symptom Tracking rebuild (fastwell-tracking-cycle-build.md),
+the Track hub was replaced by the new adaptive period/symptom Tracking page. The
+following are explicitly parked, not deleted — code and routes intact:
+- Macros: unlinked from the tab bar (`/macros` still loads directly). Returns for
+  the payment tier.
+- Me stats tab (fasts/badges/streaks/trends): unlinked from the tab bar (`/results`
+  still loads directly). To be harvested into the new Results tab (`/progress`) next
+  build.
+- Weight + biomarkers: still only reachable via the fasting page and Home's
+  add-a-habit library, not from Tracking. To be re-homed into Tracking and/or
+  Results next build.
+- The old per-metric Track sub-pages (weight, sleep, water, steps, exercise, mood,
+  energy, symptoms, caffeine, fruits, meditation, reading, review) are untouched and
+  still reachable via Home's habit library; none are linked from the new Tracking
+  hub, which is now entirely the cycle/symptom feature.
