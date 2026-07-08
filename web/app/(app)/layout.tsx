@@ -15,16 +15,6 @@ function HomeIcon({ active }: { active: boolean }) {
   );
 }
 
-function MacrosIcon({ active }: { active: boolean }) {
-  return (
-    <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8}>
-      <path d="M3 11c0-1.1.9-2 2-2h14a2 2 0 012 2v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-2z" strokeLinejoin="round" />
-      <path d="M12 9V5m0 14v-5" strokeLinecap="round" />
-      <path d="M8 9V7m8 2V7" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 function EducationIcon({ active }: { active: boolean }) {
   return (
     <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8}>
@@ -45,21 +35,29 @@ function TrackIcon({ active }: { active: boolean }) {
   );
 }
 
-function MeIcon({ active }: { active: boolean }) {
+function ResultsIcon({ active }: { active: boolean }) {
   return (
-    <svg className="nav-icon" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={active ? 0 : 1.8}>
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" strokeLinecap="round" strokeLinejoin="round" />
+    <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8}>
+      <path d="M4 20V10M12 20V4M20 20v-7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function SettingsIcon({ active }: { active: boolean }) {
+  return (
+    <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
 const NAV = [
   { href: '/dashboard', label: 'Home', Icon: HomeIcon },
-  { href: '/macros', label: 'Macros', Icon: MacrosIcon },
+  { href: '/track', label: 'Tracking', Icon: TrackIcon },
   { href: '/education', label: 'Learn', Icon: EducationIcon },
-  { href: '/track', label: 'Track', Icon: TrackIcon },
-  { href: '/results', label: 'Me', Icon: MeIcon },
+  { href: '/progress', label: 'Results', Icon: ResultsIcon },
+  { href: '/settings', label: 'Settings', Icon: SettingsIcon },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
