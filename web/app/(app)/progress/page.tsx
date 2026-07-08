@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { BarChart as RechartsBarChart, Bar, LineChart as RechartsLineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { useAuth } from '@/lib/auth-context';
 import { getSupabase } from '@/lib/supabase-browser';
 import { todayNZ } from '@/lib/dateNZ';
@@ -8,7 +9,8 @@ import { BackChip } from '../settings/_components';
 import {
   getUserHabits, habitColour, habitGoalNumber, buildHabitValueMap,
   activeDaysSet, currentStreak, bestStreak, averageCompletionRate, isHabitDone,
-  type HabitDef, type ValueMap,
+  buildHabitTrendPoints, NUMERIC_GOAL_KEYS,
+  type HabitDef, type ValueMap, type ChartPoint, type TrendPeriod,
 } from '@/lib/resultsHabits';
 
 function toISO(d: Date) {
@@ -274,6 +276,86 @@ function YearlyHeatmap({ habitKey, valueMap, goal, today, colour }: {
 
 // ─── Per-habit view ──────────────────────────────────────────────────────
 
+// ─── Trend chart — reference-style, brand colours, Week/Month/Year toggle ──
+
+function PeriodToggle({ period, onChange, colour }: { period: TrendPeriod; onChange: (p: TrendPeriod) => void; colour: string }) {
+  const OPTIONS: { key: TrendPeriod; label: string }[] = [{ key: 'week', label: 'Week' }, { key: 'month', label: 'Month' }, { key: 'year', label: 'Year' }];
+  return (
+    <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+      {OPTIONS.map(o => {
+        const active = period === o.key;
+        return (
+          <button
+            key={o.key}
+            onClick={() => onChange(o.key)}
+            style={{
+              padding: '6px 14px', borderRadius: 20, cursor: 'pointer',
+              border: `1.5px solid ${active ? colour : 'var(--border)'}`,
+              backgroundColor: active ? colour + '1A' : 'var(--surface)',
+              color: active ? colour : 'var(--text-muted)',
+              fontFamily: 'Montserrat, sans-serif', fontWeight: 600, fontSize: 12,
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function TrendBarChart({ points, colour }: { points: ChartPoint[]; colour: string }) {
+  const interval = points.length > 12 ? Math.ceil(points.length / 8) - 1 : 0;
+  return (
+    <ResponsiveContainer width="100%" height={120}>
+      <RechartsBarChart data={points} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+        <XAxis dataKey="label" tick={{ fontSize: 10, fontFamily: 'Montserrat, sans-serif', fill: 'var(--text-muted)', fontWeight: 600 }} tickLine={false} axisLine={false} interval={interval} />
+        <YAxis hide width={0} domain={[0, 'auto']} />
+        <Bar dataKey="value" fill={colour} radius={[3, 3, 0, 0]} />
+      </RechartsBarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function TrendLineChart({ points, colour }: { points: ChartPoint[]; colour: string }) {
+  const chartData = points.map(p => ({ label: p.label, value: p.value > 0 ? p.value : null }));
+  const interval = points.length > 12 ? Math.ceil(points.length / 8) - 1 : 0;
+  return (
+    <ResponsiveContainer width="100%" height={120}>
+      <RechartsLineChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+        <XAxis dataKey="label" tick={{ fontSize: 10, fontFamily: 'Montserrat, sans-serif', fill: 'var(--text-muted)', fontWeight: 600 }} tickLine={false} axisLine={false} interval={interval} />
+        <YAxis hide width={0} domain={['auto', 'auto']} />
+        <Line type="monotone" dataKey="value" stroke={colour} strokeWidth={2} dot={{ r: 2, fill: colour, strokeWidth: 0 }} activeDot={{ r: 4 }} connectNulls={false} />
+      </RechartsLineChart>
+    </ResponsiveContainer>
+  );
+}
+
+function HabitTrendChart({ habit, valueMap, today }: { habit: HabitDef; valueMap: ValueMap; today: string }) {
+  const colour = habitColour(habit.key);
+  const [period, setPeriod] = useState<TrendPeriod>('week');
+  const points = useMemo(() => buildHabitTrendPoints(habit.key, period, valueMap, today), [habit.key, period, valueMap, today]);
+  const hasData = points.some(p => p.value > 0);
+
+  return (
+    <div className="card-lg">
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
+        <p className="section-label" style={{ marginBottom: 0 }}>Trend</p>
+      </div>
+      <PeriodToggle period={period} onChange={setPeriod} colour={colour} />
+      {hasData ? (
+        NUMERIC_GOAL_KEYS.has(habit.key)
+          ? <TrendBarChart points={points} colour={colour} />
+          : <TrendLineChart points={points} colour={colour} />
+      ) : (
+        <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <p className="body-sm">Nothing logged yet for this period.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HabitView({ habit, valueMap, goal, today }: { habit: HabitDef; valueMap: ValueMap; goal: number; today: string }) {
   const colour = habitColour(habit.key);
   const [month, setMonth] = useState(() => new Date(today));
@@ -299,6 +381,10 @@ function HabitView({ habit, valueMap, goal, today }: { habit: HabitDef; valueMap
         <StatCard label="Best streak" value={`${best} day${best === 1 ? '' : 's'}`} colour={colour} />
         <StatCard label="Success count" value={String(successCount)} colour={colour} />
         <StatCard label="Completion rate" value={completionRate != null ? `${completionRate}%` : '—'} colour={colour} />
+      </div>
+
+      <div className="section">
+        <HabitTrendChart habit={habit} valueMap={valueMap} today={today} />
       </div>
 
       <div className="section">

@@ -193,3 +193,38 @@ export function averageCompletionRate(
   }
   return dayCount > 0 ? Math.round((sum / dayCount) * 100) : 0;
 }
+
+// ─── Trend chart data (reuses the same value map — Week/Month/Year buckets) ─
+
+export type TrendPeriod = 'week' | 'month' | 'year';
+export interface ChartPoint { label: string; value: number }
+
+const DAY_ABBRS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+export function buildHabitTrendPoints(habitKey: string, period: TrendPeriod, valueMap: ValueMap, todayISO: string): ChartPoint[] {
+  const series = valueMap[habitKey] ?? {};
+  const today = new Date(todayISO + 'T00:00:00Z');
+
+  if (period === 'week') {
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today); d.setUTCDate(today.getUTCDate() - 6 + i);
+      return { label: DAY_ABBRS[d.getUTCDay()], value: series[d.toISOString().slice(0, 10)] ?? 0 };
+    });
+  }
+  if (period === 'month') {
+    return Array.from({ length: 30 }, (_, i) => {
+      const d = new Date(today); d.setUTCDate(today.getUTCDate() - 29 + i);
+      return { label: String(d.getUTCDate()), value: series[d.toISOString().slice(0, 10)] ?? 0 };
+    });
+  }
+  // year — 12 months, averaged across the days logged in that month
+  return Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(today.getFullYear(), today.getMonth() - 11 + i, 1);
+    const y = d.getFullYear(), m = d.getMonth();
+    const vals = Object.entries(series)
+      .filter(([date]) => { const dd = new Date(date + 'T00:00:00Z'); return dd.getUTCFullYear() === y && dd.getUTCMonth() === m; })
+      .map(([, v]) => v);
+    return { label: MONTH_LABELS[m], value: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0 };
+  });
+}
