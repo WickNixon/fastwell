@@ -7,7 +7,7 @@ import { todayNZ } from '@/lib/dateNZ';
 import { BackChip } from '../settings/_components';
 import {
   getUserHabits, habitColour, habitGoalNumber, buildHabitValueMap,
-  activeDaysSet, currentStreak, bestStreak, averageCompletionRate,
+  activeDaysSet, currentStreak, bestStreak, averageCompletionRate, isHabitDone,
   type HabitDef, type ValueMap,
 } from '@/lib/resultsHabits';
 
@@ -180,14 +180,142 @@ function OverallView({ habits, valueMap, goals, today }: { habits: HabitDef[]; v
   );
 }
 
-// ─── Per-habit view (filled in Change 3) ────────────────────────────────────
+// ─── Per-habit month calendar (navigable, that habit's own done state) ─────
+
+function HabitMonthCalendar({ month, onMonthChange, habitKey, valueMap, goal, today, colour }: {
+  month: Date; onMonthChange: (m: Date) => void; habitKey: string; valueMap: ValueMap; goal: number; today: string; colour: string;
+}) {
+  const cells = useMemo(() => daysInMonthGrid(month), [month]);
+  const monthLabel = month.toLocaleDateString('en-NZ', { month: 'long', year: 'numeric' });
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <button onClick={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
+          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 18, cursor: 'pointer', padding: 4 }} aria-label="Previous month">‹</button>
+        <p className="section-label" style={{ marginBottom: 0 }}>{monthLabel}</p>
+        <button onClick={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 18, cursor: 'pointer', padding: 4 }} aria-label="Next month">›</button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 4 }}>
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+          <div key={i} style={{ textAlign: 'center', fontSize: 10, color: 'var(--text-muted)', fontFamily: 'Montserrat, sans-serif', fontWeight: 600 }}>{d}</div>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
+        {cells.map((d, i) => {
+          if (!d) return <div key={i} />;
+          const iso = toISO(d);
+          const isToday = iso === today;
+          const done = isHabitDone(habitKey, iso, valueMap, goal);
+          const logged = valueMap[habitKey]?.[iso] != null;
+          return (
+            <div key={i} style={{
+              aspectRatio: '1', borderRadius: 8,
+              border: isToday ? `1.5px solid ${colour}` : '1px solid var(--border)',
+              backgroundColor: done ? colour : logged ? colour + '40' : 'var(--surface)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: 'Lato, sans-serif', fontSize: 11, fontWeight: isToday ? 700 : 400,
+              color: done ? '#FFFFFF' : 'var(--text-muted)',
+            }}>
+              {d.getDate()}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Yearly heatmap (small, GitHub-style) ──────────────────────────────────
+
+function YearlyHeatmap({ habitKey, valueMap, goal, today, colour }: {
+  habitKey: string; valueMap: ValueMap; goal: number; today: string; colour: string;
+}) {
+  const weeks = useMemo(() => {
+    const end = new Date(today + 'T00:00:00Z');
+    // Roll back to the Monday of the current week, then 52 more weeks before that.
+    const endDay = (end.getUTCDay() + 6) % 7;
+    const gridEnd = new Date(end); gridEnd.setUTCDate(end.getUTCDate() + (6 - endDay));
+    const gridStart = new Date(gridEnd); gridStart.setUTCDate(gridEnd.getUTCDate() - 7 * 52 - 6);
+    const cols: { iso: string; done: boolean; logged: boolean }[][] = [];
+    const cursor = new Date(gridStart);
+    for (let w = 0; w < 53; w++) {
+      const col: { iso: string; done: boolean; logged: boolean }[] = [];
+      for (let d = 0; d < 7; d++) {
+        const iso = cursor.toISOString().slice(0, 10);
+        col.push({ iso, done: iso <= today && isHabitDone(habitKey, iso, valueMap, goal), logged: iso <= today && valueMap[habitKey]?.[iso] != null });
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+      cols.push(col);
+    }
+    return cols;
+  }, [habitKey, valueMap, goal, today]);
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <div style={{ display: 'grid', gridAutoFlow: 'column', gridTemplateRows: 'repeat(7, 7px)', gap: 2, width: 'max-content', padding: '2px 0' }}>
+        {weeks.flatMap((col, w) => col.map((cell, d) => {
+          const future = cell.iso > today;
+          return (
+            <div
+              key={`${w}-${d}`}
+              title={cell.iso}
+              style={{
+                width: 7, height: 7, borderRadius: 2,
+                backgroundColor: future ? 'transparent' : cell.done ? colour : cell.logged ? colour + '40' : 'var(--border)',
+              }}
+            />
+          );
+        }))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Per-habit view ──────────────────────────────────────────────────────
 
 function HabitView({ habit, valueMap, goal, today }: { habit: HabitDef; valueMap: ValueMap; goal: number; today: string }) {
-  void valueMap; void goal; void today;
+  const colour = habitColour(habit.key);
+  const [month, setMonth] = useState(() => new Date(today));
+
+  const habitActiveDates = useMemo(
+    () => activeDaysSet([habit.key], valueMap, { [habit.key]: goal }),
+    [habit.key, valueMap, goal]
+  );
+  const streak = useMemo(() => currentStreak(habitActiveDates, today), [habitActiveDates, today]);
+  const best = useMemo(() => bestStreak(habitActiveDates), [habitActiveDates]);
+  const successCount = habitActiveDates.size;
+
+  const loggedDates = Object.keys(valueMap[habit.key] ?? {});
+  const firstLogged = loggedDates.length > 0 ? loggedDates.sort()[0] : null;
+  const completionRate = firstLogged
+    ? Math.round((successCount / (Math.round((new Date(today + 'T00:00:00Z').getTime() - new Date(firstLogged + 'T00:00:00Z').getTime()) / 86_400_000) + 1)) * 100)
+    : null;
+
   return (
-    <div className="card-lg">
-      <p className="section-label" style={{ color: habitColour(habit.key) }}>{habit.label}</p>
-      <p className="body-sm">Habit detail coming next.</p>
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+        <StatCard label="Current streak" value={`${streak} day${streak === 1 ? '' : 's'}`} colour={colour} />
+        <StatCard label="Best streak" value={`${best} day${best === 1 ? '' : 's'}`} colour={colour} />
+        <StatCard label="Success count" value={String(successCount)} colour={colour} />
+        <StatCard label="Completion rate" value={completionRate != null ? `${completionRate}%` : '—'} colour={colour} />
+      </div>
+
+      <div className="section">
+        <div className="card">
+          <HabitMonthCalendar
+            month={month} onMonthChange={setMonth}
+            habitKey={habit.key} valueMap={valueMap} goal={goal} today={today} colour={colour}
+          />
+        </div>
+      </div>
+
+      <div className="section">
+        <p className="section-label">Yearly status</p>
+        <div className="card">
+          <YearlyHeatmap habitKey={habit.key} valueMap={valueMap} goal={goal} today={today} colour={colour} />
+        </div>
+      </div>
     </div>
   );
 }
