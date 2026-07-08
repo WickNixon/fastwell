@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
 
-const PROTECTED = ['/dashboard', '/fasting', '/track', '/biomarkers', '/supplements', '/results', '/rewards', '/paywall', '/settings'];
+const PROTECTED = ['/dashboard', '/fasting', '/track', '/biomarkers', '/supplements', '/results', '/progress', '/rewards', '/paywall', '/settings'];
 const AUTH_ROUTES = ['/login', '/signup', '/forgot-password', '/reset-password'];
 
 export async function middleware(request: NextRequest) {
